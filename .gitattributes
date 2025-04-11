@@ -1,0 +1,6 @@
+#Git LFS Tracking Rules
+*.zip filter=lfs diff=lfs merge=lfs -text
+*.csv filter=lfs diff=lfs merge=lfs -text
+*.RData filter=lfs diff=lfs merge=lfs -text
+*.[Rr][Dd]ata filter=lfs diff=lfs merge=lfs -text
+*.Rproj.user/ filter=lfs diff=lfs merge=lfs -text
