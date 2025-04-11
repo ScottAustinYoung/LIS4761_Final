@@ -1,0 +1,62 @@
+---
+title: "CMS Final Project"
+author: Christopher Reddish, Khushi Patel, Naomi Vaid, Sneh Patel, Scott Young,  and
+  Steven Barden
+date: ""
+output: html_document
+---
+
+## Introduction
+
+```{r, "Libraries"}
+# Add your library below.
+
+
+```
+
+##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
+1. Filtering out Florida Data
+2. Adding Custom Labels for column (needed)
+3. Removing unwanted columns (needed)
+```{r, "Step 1"}
+## Step 1.1
+# Read CSV 
+# data <- read.csv("data/OGdataCMS.csv")  
+
+# Filter rows where zipcode is between 32001 and 34999
+# filtered_data <- data[data$Rndrng_Prvdr_Zip5 >= 32001 & data$Rndrng_Prvdr_Zip5 <= 34999, ]
+
+# Save the filtered data to a new CSV in the 'data' folder
+# write.csv(filtered_data, "data/filtered_data.csv", row.names = FALSE)
+
+# Print confirmation
+print(paste("Filtered data saved to: data/filtered_data.csv"))
+```
+
+## Association Rule Mining: Christopher Reddish, Scott Young
+ 
+```{r, "Step 2"}
+
+```
+
+
+## K-Means Clustering: Christopher Reddish, Sneh Patel
+
+```{r, "Step 3"}
+
+```
+
+
+## Linear Regression: Steven Barden, Scott Young
+ 
+```{r, "Step 4"}
+
+```
+
+
+
+## Heat Map Visual: Khushi Patel, Naomi Vaid
+ 
+```{r, "Step 5"}
+
+```
