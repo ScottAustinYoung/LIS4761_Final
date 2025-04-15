@@ -50,10 +50,32 @@ print(paste("Filtered data saved to: data/filtered_data.csv"))
 ## Linear Regression: Steven Barden, Scott Young
  
 ```{r, "Step 4"}
+df_lm <- read.csv("Data/chris_cleaned_data.csv") #replace once 1.1 is revised with the loaded data so that we have a separate df to as.factor the needed variables.
 
+#Ensuring the Linear Regression model understands that the following variables are categorical and not numeric types.
+df_lm$Place_Of_Srvc <- as.factor(df_lm$Place_Of_Srvc)
+df_lm$Specialty <- as.factor(df_lm$Specialty)
+df_lm$RUCA_Desc <- as.factor(df_lm$RUCA_Desc)
+
+#Creation of the Linear Regression model.
+lm_model <- lm(Medicare_Payment ~ Services + Submitted_Charge + Beneficiaries +
+                 Place_Of_Srvc + Specialty + RUCA_Desc, data = df_lm)
+
+summary(lm_model)
 ```
-
-
+# The linear model uses Services, Submitted_Charge, and Beneficiaries as the numeric predictors.
+# The categorical predictors are Place_Of_Srvc, Specialty, and RUCA_Desc.
+# The R-squared value of the model is 0.6486, which explains a 65%~ variation in Medicare_Payment.
+# The F-statistic & P-values are both quite high, indicating a statistically significant model.
+# The average error stands at about $176.
+# As the Services increase, the average Medicare_Payment slightly decreases which tells that dense facilities reflect an economy-of-scale factor.
+# The strongest predictor is the Submitted_Charge value, in which higher billed values raises Medicare payments, as is obvious.
+# Beneficiaries stands as not significant, meaning the amount of people receiving service does not influence costs.
+# Place_Of_Srvc0, in an office setting, has a high p-value of $20.20. This stands to reason that smaller facilities are associated with a higher cost.
+# In terms of other categorical variables and their effect, Specialty has a range of types in which costs are reduced or increased on average.
+## Increases include: Ambulance Service Provider, Oral Surgery, Peripheral Vascular Disease, and Micrographic Dermatologic Surgery.
+## Decreases include: CRN and Anesthesiology.
+# RUCA_Desc has the following takeaways: Micropolitan areas receive less payment, Secondary flow to large urbanized areas has a higher payment.
 
 ## Heat Map Visual: Khushi Patel, Naomi Vaid
  
