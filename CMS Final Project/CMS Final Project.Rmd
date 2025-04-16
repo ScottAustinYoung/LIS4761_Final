@@ -177,4 +177,77 @@ summary(lm_model)
  
 ```{r, "Step 5"}
 
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(readr)
+
+# File paths
+medicare_path <- "~/Desktop/medicare_cleaned.csv"
+shapefile_path <- "~/Desktop/tl_2010_12_zcta510.shp"
+
+# Load Medicare data
+medicare_cleaned <- read_csv(medicare_path) %>%
+  mutate(Zip = as.character(Zip))
+
+# Load shapefile
+zcta <- st_read(shapefile_path) %>%
+  mutate(ZCTA5CE10 = as.character(ZCTA5CE10))
+
+# Choose specialty
+selected_specialty <- "Internal Medicine"
+
+# Filter and summarize
+filtered_data <- medicare_cleaned %>%
+  filter(Specialty == selected_specialty) %>%
+  group_by(Zip) %>%
+  summarize(
+    Avg_Payment = mean(Medicare_Payment, na.rm = TRUE),
+    Providers = n(),
+    .groups = "drop"
+  )
+
+# Merge with shapefile
+merged_data <- zcta %>%
+  left_join(filtered_data, by = c("ZCTA5CE10" = "Zip"))
+
+# Create heat map
+ggplot(data = merged_data) +
+  geom_sf(aes(fill = Avg_Payment), color = "white", size = 0.2) +
+  scale_fill_viridis_c(
+    option = "plasma",
+    na.value = "grey90",
+    name = "Avg Payment ($)",
+    limits = c(0, 150),
+    breaks = c(0, 50, 100, 150),
+    oob = scales::squish
+  ) +
+  labs(
+    title = "Medicare Average Payment by ZIP Code in Florida",
+    subtitle = paste("Specialty:", selected_specialty),
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    plot.caption = element_text(size = 10, face = "italic")
+  )
+
+# Here's a summary of our analysis based on Medicare payment data visualization:
+
+# We analyzed average Medicare payments for providers specializing in Internal Medicine across Florida ZIP codes. 
+# This process began by loading and preparing a cleaned Medicare dataset and a shapefile representing Florida ZIP Code Tabulation Areas (ZCTAs).
+
+# After filtering the data for the selected specialty ("Internal Medicine"), we calculated the average Medicare 
+# payment and the number of providers per ZIP code. This summarized dataset was then merged with the shapefile data 
+# to enable geographic plotting.
+
+# Using ggplot2 and the sf package, we created a choropleth map showing the distribution of average Medicare payments 
+# across Florida. Areas with higher average payments appear in brighter plasma shades, while areas with lower payments 
+# or no data are shown in muted tones.
+
+# The heatmap helps reveal regional disparities in Medicare reimbursements, highlighting ZIP codes with notably higher 
+# or lower average payments. These visual insights can inform further investigation into geographic trends in healthcare 
+# spending, potential inequities in reimbursement rates, or gaps in provider coverage for Internal Medicine in Florida.
 ```
