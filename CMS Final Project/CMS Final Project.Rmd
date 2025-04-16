@@ -34,7 +34,7 @@ library(GGally)
 print(paste("Filtered data saved to: data/filtered_data.csv"))
 #"further cleaned the dataset using Excel and corrected some data inconsistencies. This process ensured the removal of any discrepancies and improved the overall accuracy of the data
 #Step2.2
-#Adding Custom Labels for column did using excel.
+#Added Custom Labels for column did using excel.
 ```
 
 ## Association Rule Mining: Christopher Reddish, Scott Young
