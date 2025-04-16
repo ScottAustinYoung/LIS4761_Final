@@ -234,7 +234,7 @@ ggplot(data = merged_data) +
     plot.caption = element_text(size = 10, face = "italic")
   )
 
-# Here's a summary of our analysis based on Medicare payment data visualization:
+# Here is a summary of our analysis based on Medicare payment data visualization:
 
 # We analyzed average Medicare payments for providers specializing in Internal Medicine across Florida ZIP codes. 
 # This process began by loading and preparing a cleaned Medicare dataset and a shapefile representing Florida ZIP Code Tabulation Areas (ZCTAs).
