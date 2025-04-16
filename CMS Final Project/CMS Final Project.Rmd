@@ -47,7 +47,7 @@ print(paste("Filtered data saved to: data/filtered_data.csv"))
 ## K-Means Clustering: Christopher Reddish, Sneh Patel
 
 ```{r, "Step 3"}
-
+#The primary goal of this analysis is to segment healthcare providers into distinct groups based on their service volume, average submitted charges, and average Medicare payment amounts to identify potential billing anomalies, promote best practices in cost-effective care, and inform targeted policy interventions within the Medicare system.
 # Helper function to clean monetary columns
 clean_money <- function(x) {
   as.numeric(gsub("[$,]", "", x))
