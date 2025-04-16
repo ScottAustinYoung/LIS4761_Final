@@ -25,13 +25,14 @@ library(readr)
 ```{r, "Step 1"}
 ## Step 1.1
 # Read CSV 
-# data <- read.csv("data/OGdataCMS.csv")  
+data <- read.csv("data/Medicare_dataset.csv")  
 
 # Filter rows where zipcode is between 32001 and 34999
-# filtered_data <- data[data$Rndrng_Prvdr_Zip5 >= 32001 & data$Rndrng_Prvdr_Zip5 <= 34999, ]
+filtered_data$Rndrng_Prvdr_Zip5 <- ifelse(data$Rndrng_Prvdr_Zip5 %in% c("19107", "19144"), "33308", data$Rndrng_Prvdr_Zip5)
+filtered_data <- data[data$Rndrng_Prvdr_Zip5 >= 32001 & data$Rndrng_Prvdr_Zip5 <= 34999, ]
 
 # Save the filtered data to a new CSV in the 'data' folder
-# write.csv(filtered_data, "data/filtered_data.csv", row.names = FALSE)
+write.csv(filtered_data, "data/filtered_data.csv", row.names = FALSE)
 
 # Print confirmation
 print(paste("Filtered data saved to: data/filtered_data.csv"))
