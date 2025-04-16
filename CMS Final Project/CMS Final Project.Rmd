@@ -127,7 +127,7 @@ print(cluster_summary)
 
 
 ```
-#Here's a summary of our analysis, based on the provided data and the cluster results:
+# Here's a summary of our analysis, based on the provided data and the cluster results:
 # We performed K-means clustering on a dataset of healthcare providers to identify distinct groups based on their service volume (Total_Services), average submitted charges (Avg_Sbmtd_Chrg), and average Medicare payment amounts (Avg_Pymt_Amt). 
 # This involved cleaning the data to handle currency formatting, scaling the relevant columns, and then running the K-means algorithm to group providers into clusters. Based on this, a summary of the clusters can be performed
 # The clustering process revealed four distinct provider groups:
