@@ -48,7 +48,7 @@ print(paste("Filtered data saved to: data/filtered_data.csv"))
 
 
 ## K-Means Clustering: Christopher Reddish, Sneh Patel
-#The primary goal of this analysis is to segment healthcare providers into distinct groups based on their service volume, average submitted charges, and average Medicare payment amounts to identify potential billing anomalies, promote best practices in cost-effective care, and inform targeted policy interventions within the Medicare system.
+# The primary goal of this analysis is to segment healthcare providers into distinct groups based on their service volume, average submitted charges, and average Medicare payment amounts to identify potential billing anomalies, promote best practices in cost-effective care, and inform targeted policy interventions within the Medicare system.
 
 ```{r, "Step 3"}
 
