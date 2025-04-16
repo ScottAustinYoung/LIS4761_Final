@@ -120,9 +120,11 @@ cluster_summary <- results %>%
     )
 
 print(cluster_summary)
+
 #Here's a summary of our analysis, based on the provided data and the cluster results:
 
-# We performed K-means clustering on a dataset of healthcare providers to identify distinct groups based on their service volume (Total_Services), average submitted charges (Avg_Sbmtd_Chrg), and average Medicare payment amounts (Avg_Pymt_Amt). This involved cleaning the data to handle currency formatting, scaling the relevant columns, and then running the K-means algorithm to group providers into clusters. Based on this, a summary of the clusters can be performed
+# We performed K-means clustering on a dataset of healthcare providers to identify distinct groups based on their service volume (Total_Services), average submitted charges (Avg_Sbmtd_Chrg), and average Medicare payment amounts (Avg_Pymt_Amt). 
+# This involved cleaning the data to handle currency formatting, scaling the relevant columns, and then running the K-means algorithm to group providers into clusters. Based on this, a summary of the clusters can be performed
 
 # The clustering process revealed four distinct provider groups:
 
@@ -132,9 +134,12 @@ print(cluster_summary)
 
 # Cluster 3: The smallest group, this group is associated with a low average number of services (35.48), while incurring incredibly high average submitted charges (40919.94) with a result of very high average payment amounts (8328.96).
 
-#Cluster 4: This cluster has the highest average number of services (515.20), while having low submitted charges (204.16), ultimately leading to low payment amounts (58.04).
+# Cluster 4: This cluster has the highest average number of services (515.20), while having low submitted charges (204.16), ultimately leading to low payment amounts (58.04).
 
-# These findings offer actionable insights. Clusters 1 and 3 might warrant further investigation for potentially inflated billing practices due to their high charges despite low service volumes. Conversely, Cluster 4 represents a high-volume, low-cost service model, which could be studied to identify best practices for efficient healthcare delivery. Cluster 2 represents the average provider, based on this dataset. These insights can inform targeted policy interventions, audits, and strategies for improving cost-effectiveness and quality of care within the Medicare syste
+# These findings offer actionable insights. Clusters 1 and 3 might warrant further investigation for potentially inflated billing practices due to their high charges despite low service volumes. 
+# Conversely, Cluster 4 represents a high-volume, low-cost service model, which could be studied to identify best practices for efficient healthcare delivery. 
+# Cluster 2 represents the average provider, based on this dataset. 
+# These insights can inform targeted policy interventions, audits, and strategies for improving cost-effectiveness and quality of care within the Medicare system
 ```
 
 
