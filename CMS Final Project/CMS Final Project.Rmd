@@ -17,7 +17,7 @@ library(GGally)
 
 ##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
 1. Filtering out Florida Data
-2. Adding Custom Labels for column (needed)
+2. Adding Custom Labels for column
 3. Removing unwanted columns (needed)
 ```{r, "Step 1"}
 ## Step 1.1
