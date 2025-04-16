@@ -10,7 +10,8 @@ output: html_document
 
 ```{r, "Libraries"}
 # Add your library below.
-
+library(tidyverse)
+library(GGally)
 
 ```
 
@@ -47,6 +48,93 @@ print(paste("Filtered data saved to: data/filtered_data.csv"))
 
 ```{r, "Step 3"}
 
+# Helper function to clean monetary columns
+clean_money <- function(x) {
+  as.numeric(gsub("[$,]", "", x))
+}
+
+# 1. Load and clean only the necessary columns
+df_raw <- read_csv("data/Rendering_Provider.csv", col_types = cols(.default = "c")) %>%
+  mutate(
+    Total_Services = as.numeric(`Total Services`),
+    Avg_Sbmtd_Chrg = clean_money(`Average Submitted Charge`),
+    Avg_Pymt_Amt = clean_money(`Average Medicare Payment Amount`)
+  ) %>%
+  select(
+    Total_Services,
+    Avg_Sbmtd_Chrg,
+    Avg_Pymt_Amt
+  ) %>%
+  na.omit()
+
+cat("Rows after cleaning:", nrow(df_raw), "\n")
+cat("Unique rows:", nrow(unique(df_raw)), "\n")
+
+# 2. Scale the data
+df_scaled <- scale(df_raw)
+
+# 3. Determine number of clusters (up to 4)
+k <- min(4, nrow(unique(df_scaled)))
+if (k < 2) stop("Not enough data to form clusters.")
+
+# 4. Run k-means clustering
+set.seed(123)
+clusters <- kmeans(df_scaled, centers = k, nstart = 25)
+
+# 5. Add cluster labels to the original data
+results <- read_csv("data/Rendering_Provider.csv", col_types = cols(.default = "c")) %>%
+  mutate(
+    Total_Services = as.numeric(`Total Services`),
+    Avg_Sbmtd_Chrg = clean_money(`Average Submitted Charge`),
+    Avg_Pymt_Amt = clean_money(`Average Medicare Payment Amount`)
+  ) %>%
+  select(
+    Total_Services,
+    Avg_Sbmtd_Chrg,
+    Avg_Pymt_Amt
+  ) %>%
+  na.omit() %>% 
+  mutate(Cluster = clusters$cluster)
+
+# 6. Save results
+write_csv(results, "provider_clusters.csv")
+
+# 7. Visualize clusters (optional)
+ggpairs(
+  bind_cols(as_tibble(df_raw), Cluster = factor(clusters$cluster)),
+  columns = 1:3,
+  aes(color = Cluster)
+)
+
+# 8. Calculate summary statistics for each cluster
+cluster_summary <- results %>%
+    group_by(Cluster) %>%
+    summarize(
+        count = n(),
+        mean_services = mean(Total_Services, na.rm = TRUE),
+        median_services = median(Total_Services, na.rm = TRUE),
+        mean_submitted_charge = mean(Avg_Sbmtd_Chrg, na.rm = TRUE),
+        median_submitted_charge = median(Avg_Sbmtd_Chrg, na.rm = TRUE),
+        mean_payment = mean(Avg_Pymt_Amt, na.rm = TRUE),
+        median_payment = median(Avg_Pymt_Amt, na.rm = TRUE)
+    )
+
+print(cluster_summary)
+#Here's a summary of our analysis, based on the provided data and the cluster results:
+
+# We performed K-means clustering on a dataset of healthcare providers to identify distinct groups based on their service volume (Total_Services), average submitted charges (Avg_Sbmtd_Chrg), and average Medicare payment amounts (Avg_Pymt_Amt). This involved cleaning the data to handle currency formatting, scaling the relevant columns, and then running the K-means algorithm to group providers into clusters. Based on this, a summary of the clusters can be performed
+
+# The clustering process revealed four distinct provider groups:
+
+# Cluster 1: These providers exhibit a smaller average number of services (41.43), and are associated with very high average submitted charges (6860.51) and high average payment amounts (1116.04).
+
+# Cluster 2: This is the largest group, with the vast majority of providers, and they have somewhat low average number of services (63.48) and average submitted charges (366.53), resulting in moderate average payment amounts (79.17).
+
+# Cluster 3: The smallest group, this group is associated with a low average number of services (35.48), while incurring incredibly high average submitted charges (40919.94) with a result of very high average payment amounts (8328.96).
+
+#Cluster 4: This cluster has the highest average number of services (515.20), while having low submitted charges (204.16), ultimately leading to low payment amounts (58.04).
+
+# These findings offer actionable insights. Clusters 1 and 3 might warrant further investigation for potentially inflated billing practices due to their high charges despite low service volumes. Conversely, Cluster 4 represents a high-volume, low-cost service model, which could be studied to identify best practices for efficient healthcare delivery. Cluster 2 represents the average provider, based on this dataset. These insights can inform targeted policy interventions, audits, and strategies for improving cost-effectiveness and quality of care within the Medicare syste
 ```
 
 
