@@ -25,17 +25,50 @@ library(readr)
 ```{r, "Step 1"}
 ## Step 1.1
 # Read CSV 
-data <- read.csv("data/Medicare_dataset.csv")  
-
-# Filter rows where zipcode is between 32001 and 34999
-filtered_data$Rndrng_Prvdr_Zip5 <- ifelse(data$Rndrng_Prvdr_Zip5 %in% c("19107", "19144"), "33308", data$Rndrng_Prvdr_Zip5)
-filtered_data <- data[data$Rndrng_Prvdr_Zip5 >= 32001 & data$Rndrng_Prvdr_Zip5 <= 34999, ]
+filtered_data <- read_csv("Data/Medicare_dataset.csv", show_col_types = FALSE) %>%
+  mutate(Rndrng_Prvdr_Zip5 = ifelse(Rndrng_Prvdr_Zip5 %in% c("19107", "19144"), "33308", Rndrng_Prvdr_Zip5)) %>%
+  filter(grepl("^\\d+$", Rndrng_Prvdr_Zip5)) %>%
+  mutate(Rndrng_Prvdr_Zip5 = as.numeric(Rndrng_Prvdr_Zip5)) %>%
+  filter(Rndrng_Prvdr_Zip5 >= 32001 & Rndrng_Prvdr_Zip5 <= 34999) %>%
+  # Rename columns
+  rename(
+    NPI = Rndrng_NPI,
+    Provider_Last_Name = Rndrng_Prvdr_Last_Org_Name,
+    Provider_First_Name = Rndrng_Prvdr_First_Name,
+    Provider_MI = Rndrng_Prvdr_MI,
+    Provider_Credentials = Rndrng_Prvdr_Crdntls,
+    Entity_Code = Rndrng_Prvdr_Ent_Cd,
+    Provider_Street1 = Rndrng_Prvdr_St1,
+    Provider_Street2 = Rndrng_Prvdr_St2,
+    Provider_City = Rndrng_Prvdr_City,
+    Provider_State = Rndrng_Prvdr_State_Abrvtn,
+    FIPS_Code = Rndrng_Prvdr_State_FIPS,
+    Provider_Zip = Rndrng_Prvdr_Zip5,
+    RUCA_Code = Rndrng_Prvdr_RUCA,
+    RUCA_Description = Rndrng_Prvdr_RUCA_Desc,
+    Provider_Country = Rndrng_Prvdr_Cntry,
+    Provider_Type = Rndrng_Prvdr_Type,
+    Medicare_Participation = Rndrng_Prvdr_Mdcr_Prtcptg_Ind,
+    HCPCS_Code = HCPCS_Cd,
+    HCPCS_Description = HCPCS_Desc,
+    HCPCS_Drug_Indicator = HCPCS_Drug_Ind,
+    Place_Of_Service = Place_Of_Srvc,
+    Total_Beneficiaries = Tot_Benes,
+    Total_Services = Tot_Srvcs,
+    Total_Beneficiary_Service_Days = Tot_Bene_Day_Srvcs,
+    Avg_Submitted_Charge = Avg_Sbmtd_Chrg,
+    Avg_Medicare_Allowed = Avg_Mdcr_Alowd_Amt,
+    Avg_Medicare_Payment = Avg_Mdcr_Pymt_Amt,
+    Avg_Medicare_Standardized_Amt = Avg_Mdcr_Stdzd_Amt
+  ) %>%
+  # Drop unnecessary columns
+  select(-Provider_First_Name, -Provider_MI)
 
 # Save the filtered data to a new CSV in the 'data' folder
-write.csv(filtered_data, "data/filtered_data.csv", row.names = FALSE)
+write.csv(filtered_data, "Data/filtered_data.csv", row.names = FALSE)
 
 # Print confirmation
-print(paste("Filtered data saved to: data/filtered_data.csv"))
+print(paste("Filtered data saved to: Data/filtered_data.csv"))
 #"further cleaned the dataset using Excel and corrected some data inconsistencies. This process ensured the removal of any discrepancies and improved the overall accuracy of the data
 #Step2.2
 #Added Custom Labels for column did using excel.
@@ -55,22 +88,26 @@ print(paste("Filtered data saved to: data/filtered_data.csv"))
 
 # Helper function to clean monetary columns
 clean_money <- function(x) {
-  as.numeric(gsub("[$,]", "", x))
+  as.numeric(gsub("[$,]", "", as.character(x)))
 }
 
 # 1. Load and clean only the necessary columns
-df_raw <- read_csv("data/Rendering_Provider.csv", col_types = cols(.default = "c")) %>%
+df_raw <- read_csv("Data/filtered_data.csv", show_col_types = FALSE) %>%
   mutate(
-    Total_Services = as.numeric(`Total Services`),
-    Avg_Sbmtd_Chrg = clean_money(`Average Submitted Charge`),
-    Avg_Pymt_Amt = clean_money(`Average Medicare Payment Amount`)
+    Total_Services = as.numeric(`Total_Services`),
+    Avg_Submitted_Charge = clean_money(`Avg_Submitted_Charge`),
+    Avg_Medicare_Payment = clean_money(`Avg_Medicare_Payment`)
   ) %>%
   select(
     Total_Services,
-    Avg_Sbmtd_Chrg,
-    Avg_Pymt_Amt
+    Avg_Submitted_Charge,
+    Avg_Medicare_Payment
   ) %>%
   na.omit()
+
+stopifnot(
+  all(sapply(df_raw, is.numeric))
+)
 
 cat("Rows after cleaning:", nrow(df_raw), "\n")
 cat("Unique rows:", nrow(unique(df_raw)), "\n")
@@ -87,18 +124,7 @@ set.seed(123)
 clusters <- kmeans(df_scaled, centers = k, nstart = 25)
 
 # 5. Add cluster labels to the original data
-results <- read_csv("data/Rendering_Provider.csv", col_types = cols(.default = "c")) %>%
-  mutate(
-    Total_Services = as.numeric(`Total Services`),
-    Avg_Sbmtd_Chrg = clean_money(`Average Submitted Charge`),
-    Avg_Pymt_Amt = clean_money(`Average Medicare Payment Amount`)
-  ) %>%
-  select(
-    Total_Services,
-    Avg_Sbmtd_Chrg,
-    Avg_Pymt_Amt
-  ) %>%
-  na.omit() %>% 
+results <- df_raw %>%
   mutate(Cluster = clusters$cluster)
 
 # 6. Save results
@@ -114,15 +140,14 @@ ggpairs(
 # 8. Calculate summary statistics for each cluster
 cluster_summary <- results %>%
     group_by(Cluster) %>%
-    summarize(
-        count = n(),
-        mean_services = mean(Total_Services, na.rm = TRUE),
-        median_services = median(Total_Services, na.rm = TRUE),
-        mean_submitted_charge = mean(Avg_Sbmtd_Chrg, na.rm = TRUE),
-        median_submitted_charge = median(Avg_Sbmtd_Chrg, na.rm = TRUE),
-        mean_payment = mean(Avg_Pymt_Amt, na.rm = TRUE),
-        median_payment = median(Avg_Pymt_Amt, na.rm = TRUE)
-    )
+    summarize(across(
+      c(Total_Services, Avg_Submitted_Charge, Avg_Medicare_Payment),
+      list(
+        mean = ~mean(.x, na.rm = TRUE),
+        median = ~median(.x, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ))
 
 print(cluster_summary)
 
@@ -145,17 +170,38 @@ print(cluster_summary)
 ## Linear Regression: Steven Barden, Scott Young
  
 ```{r, "Step 4"}
-df_lm <- read.csv("Data/chris_cleaned_data.csv") #replace once 1.1 is revised with the loaded data so that we have a separate df to as.factor the needed variables.
+## Linear Regression (Step 4)
+# Load and clean with basic numeric conversion
+df_lm <- read_csv("Data/filtered_data.csv", show_col_types = FALSE) %>%
+  select(
+    Avg_Medicare_Payment,
+    Total_Services,
+    Avg_Submitted_Charge,
+    Total_Beneficiaries,
+    Place_Of_Service,
+    Provider_Type,
+    RUCA_Description
+  ) %>%
+  mutate(
+    Medicare_Payment = parse_number(as.character(Avg_Medicare_Payment)),
+    Services = parse_number(as.character(Total_Services)),
+    Submitted_Charge = parse_number(as.character(Avg_Submitted_Charge)),
+    Beneficiaries = parse_number(as.character(Total_Beneficiaries)),
+    Place_Of_Service = factor(Place_Of_Service),
+    Specialty = factor(Provider_Type),
+    RUCA_Description = factor(RUCA_Description)
+  ) %>%
+  select(-Avg_Medicare_Payment, -Total_Services, -Avg_Submitted_Charge, -Total_Beneficiaries, -Provider_Type) %>%
+  drop_na()
 
-#Ensuring the Linear Regression model understands that the following variables are categorical and not numeric types.
-df_lm$Place_Of_Srvc <- as.factor(df_lm$Place_Of_Srvc)
-df_lm$Specialty <- as.factor(df_lm$Specialty)
-df_lm$RUCA_Desc <- as.factor(df_lm$RUCA_Desc)
+# Run simplified regression (removed HCPCS_Description)
+lm_model <- lm(
+  Medicare_Payment ~ Services + Submitted_Charge + Beneficiaries + 
+    Place_Of_Service + Specialty + RUCA_Description,
+  data = df_lm
+)
 
-#Creation of the Linear Regression model.
-lm_model <- lm(Medicare_Payment ~ Services + Submitted_Charge + Beneficiaries +
-                 Place_Of_Srvc + Specialty + RUCA_Desc, data = df_lm)
-
+# View results
 summary(lm_model)
 ```
 # The linear model uses Services, Submitted_Charge, and Beneficiaries as the numeric predictors.
@@ -177,12 +223,14 @@ summary(lm_model)
 ```{r, "Step 5"}
 
 # File paths
-medicare_path <- "~/Desktop/medicare_cleaned.csv"
-shapefile_path <- "~/Desktop/tl_2010_12_zcta510.shp"
+shapefile_path <- "~/Data/tl_2010_12_zcta510.shp"
 
 # Load Medicare data
-medicare_cleaned <- read_csv(medicare_path) %>%
-  mutate(Zip = as.character(Zip))
+medicare_cleaned <- read_csv("Data/filtered_data.csv", show_col_types = FALSE) %>%
+  mutate(
+    Provider_Zip = as.character(Provider_Zip),
+    Avg_Medicare_Payment = as.numeric(gsub("[$,]", "", Avg_Medicare_Payment))
+  )
 
 # Load shapefile
 zcta <- st_read(shapefile_path) %>%
@@ -194,16 +242,16 @@ selected_specialty <- "Internal Medicine"
 # Filter and summarize
 filtered_data <- medicare_cleaned %>%
   filter(Specialty == selected_specialty) %>%
-  group_by(Zip) %>%
+  group_by(Provider_Zip) %>%
   summarize(
-    Avg_Payment = mean(Medicare_Payment, na.rm = TRUE),
+    Avg_Payment = mean(Avg_Medicare_Payment, na.rm = TRUE),
     Providers = n(),
     .groups = "drop"
   )
 
 # Merge with shapefile
 merged_data <- zcta %>%
-  left_join(filtered_data, by = c("ZCTA5CE10" = "Zip"))
+  left_join(filtered_data, by = c("ZCTA5CE10" = "Provider_Zip"))
 
 # Create heat map
 ggplot(data = merged_data) +
