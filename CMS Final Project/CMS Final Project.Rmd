@@ -92,10 +92,14 @@ write.csv(filtered_data, "Data/filtered_data.csv", row.names = FALSE)
 print(paste("Filtered data saved to: Data/filtered_data.csv"))
 
 ```
-
+## Load Data Once and Custom Functions
 ```{r, "Load Data"}
 # Load the filtered data ONCE after cleaning
 filtered_data <- read_csv("Data/filtered_data.csv", show_col_types = FALSE)
+# Helper function to clean monetary columns
+clean_money <- function(x) {
+  as.numeric(gsub("[$,]", "", as.character(x)))
+}
 ```
 
 ## Association Rule Mining: Christopher Reddish, Scott Young
@@ -120,10 +124,7 @@ rules_df <- as(rules, "data.frame")
 
 ```{r, "Step 3"}
 
-# Helper function to clean monetary columns
-clean_money <- function(x) {
-  as.numeric(gsub("[$,]", "", as.character(x)))
-}
+
 
 # 1. Load and clean only the necessary columns
 df_raw <- filtered_data %>%
