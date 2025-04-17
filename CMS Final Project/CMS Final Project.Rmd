@@ -16,6 +16,7 @@ library(ggplot2)
 library(sf)
 library(dplyr)
 library(readr)
+library(arules)
 ```
 
 ##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
@@ -75,7 +76,18 @@ print(paste("Filtered data saved to: Data/filtered_data.csv"))
 ## Association Rule Mining: Christopher Reddish, Scott Young
  
 ```{r, "Step 2"}
+filtered_data <- read_csv("Data/filtered_data.csv", show_col_types = FALSE)
+transactions_data <- filtered_data %>%
+  group_by(Provider_Type, NPI) %>%
+  summarize(HCPCS_Description = list(unique(HCPCS_Description)), .groups = "drop") %>%
+  ungroup() %>%
+  select(HCPCS_Description) %>%
+  pull()
+transactions <- as(transactions_data, "transactions")
 
+rules <- apriori(transactions, parameter = list(supp = 0.01, conf = 0.5, minlen = 2))
+inspect(head(sort(rules, by = "lift"), 10))
+rules_df <- as(rules, "data.frame")
 ```
 
 
