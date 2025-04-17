@@ -99,15 +99,16 @@ print(paste("Filtered data saved to: Data/filtered_data.csv"))
 ```
 ## Load Data Once and Custom Functions
 ```{r, "Load Data"}
-# Load the filtered data ONCE after cleaning and take care of problems of FIPS code error
+#Load the filtered data ONCE after cleaning and take care of problems of FIPS code error and zip map for k-mean map
 filtered_data <- read_csv("Data/filtered_data.csv",
                           col_types = cols(FIPS_Code = col_character())) %>%
-  mutate(FIPS_Code = as.numeric(gsub("[^0-9]", "", FIPS_Code)))
+  mutate(FIPS_Code = as.numeric(gsub("[^0-9]", "", FIPS_Code)), Provider_Zip = sprintf("%05s", as.character(Provider_Zip)))
+
 
 # Helper function to clean monetary columns
 clean_money <- function(x) {
   as.numeric(gsub("[$,]", "", as.character(x)))
-} 
+}
 
 ```
 
@@ -132,68 +133,98 @@ rules_df <- as(rules, "data.frame")
 # The primary goal of this analysis is to segment healthcare providers into distinct groups based on their service volume, average submitted charges, and average Medicare payment amounts to identify potential billing anomalies, promote best practices in cost-effective care, and inform targeted policy interventions within the Medicare system.
 
 ```{r, "Step 3"}
-
-
-
-# 1. Load and clean only the necessary columns
+# ---- Step 3: K-Means Clustering ----
+# K-Means Clustering
 df_raw <- filtered_data %>%
   mutate(
-    Total_Services = as.numeric(`Total_Services`),
-    Avg_Submitted_Charge = clean_money(`Avg_Submitted_Charge`),
-    Avg_Medicare_Payment = clean_money(`Avg_Medicare_Payment`)
+    Total_Services = as.numeric(Total_Services),
+    Avg_Submitted_Charge = clean_money(Avg_Submitted_Charge),
+    Avg_Medicare_Payment = clean_money(Avg_Medicare_Payment)
   ) %>%
-  select(
-    Total_Services,
-    Avg_Submitted_Charge,
-    Avg_Medicare_Payment
-  ) %>%
+  select(Total_Services, Avg_Submitted_Charge, Avg_Medicare_Payment) %>%
   na.omit()
 
-stopifnot(
-  all(sapply(df_raw, is.numeric))
-)
+stopifnot(all(sapply(df_raw, is.numeric)))
 
-cat("Rows after cleaning:", nrow(df_raw), "\n")
-cat("Unique rows:", nrow(unique(df_raw)), "\n")
-
-# 2. Scale the data
 df_scaled <- scale(df_raw)
-
-# 3. Determine number of clusters (up to 4)
 k <- min(4, nrow(unique(df_scaled)))
 if (k < 2) stop("Not enough data to form clusters.")
 
-# 4. Run k-means clustering
 set.seed(123)
 clusters <- kmeans(df_scaled, centers = k, nstart = 25)
 
-# 5. Add cluster labels to the original data
-results <- df_raw %>%
-  mutate(Cluster = clusters$cluster)
-
-# 6. Save results
-write_csv(results, "provider_clusters.csv")
-
-# 7. Visualize clusters (optional)
-ggpairs(
-  bind_cols(as_tibble(df_raw), Cluster = factor(clusters$cluster)),
-  columns = 1:3,
-  aes(color = Cluster)
+cluster_labels <- c(
+  "1" = "Moderate Cost, High Volume",
+  "2" = "Typical Providers",
+  "3" = "High Cost, Low Volume",
+  "4" = "Low Cost, Very High Volume"
 )
 
-# 8. Calculate summary statistics for each cluster
-cluster_summary <- results %>%
-    group_by(Cluster) %>%
-    summarize(across(
-      c(Total_Services, Avg_Submitted_Charge, Avg_Medicare_Payment),
-      list(
-        mean = ~mean(.x, na.rm = TRUE),
-        median = ~median(.x, na.rm = TRUE)
-      ),
-      .names = "{.col}_{.fn}"
-    ))
+results <- df_raw %>%
+  mutate(
+    Cluster = clusters$cluster,
+    Cluster_Label = cluster_labels[as.character(Cluster)]
+  )
 
-print(cluster_summary)
+# Mapping
+zcta_shapes <- tigris::zctas(cb = TRUE, year = 2020) %>%
+  rename(Zip = ZCTA5CE20) %>%
+  mutate(Zip = sprintf("%05s", as.character(Zip)))
+
+zip_cluster_data <- results %>%
+  mutate(Provider_Zip = filtered_data$Provider_Zip) %>%
+  group_by(Provider_Zip, Cluster_Label) %>%
+  summarise(Count = n(), .groups = "drop")
+
+zip_cluster_sf <- left_join(zcta_shapes, zip_cluster_data, by = c("Zip" = "Provider_Zip")) %>%
+  filter(!is.na(Cluster_Label)) %>%
+  st_make_valid() %>%
+  filter(st_geometry_type(geometry) %in% c("POLYGON", "MULTIPOLYGON")) %>%
+  st_transform(4326)
+
+zip_cluster_sf <- zip_cluster_sf %>%
+  mutate(
+    fill_color = dplyr::recode(Cluster_Label,
+      "Moderate Cost, High Volume" = "#1f78b4",
+      "Typical Providers" = "#33a02c",
+      "High Cost, Low Volume" = "#e31a1c",
+      "Low Cost, Very High Volume" = "#ff7f00",
+      .default = "#cccccc"
+    ),
+    opacity = scales::rescale(Count, to = c(0.4, 1))
+  )
+
+# Interactive Leaflet Map
+leaflet_map <- leaflet::leaflet(zip_cluster_sf) %>%
+  leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) %>%
+  leaflet::addPolygons(
+    fillColor = ~fill_color,
+    fillOpacity = ~opacity,
+    color = "#444444",
+    weight = 0.5,
+    popup = ~paste0(
+      "<b>ZIP:</b> ", Zip, "<br>",
+      "<b>Cluster:</b> ", Cluster_Label, "<br>",
+      "<b>Provider Count:</b> ", Count
+    )
+  ) %>%
+  leaflet::addLegend(
+    "bottomright",
+    colors = c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00"),
+    labels = c(
+      "Moderate Cost, High Volume",
+      "Typical Providers",
+      "High Cost, Low Volume",
+      "Low Cost, Very High Volume"
+    ),
+    title = "Cluster Type",
+    opacity = 1
+  )
+
+htmlwidgets::saveWidget(leaflet_map, "Medicare_Clusters_FL.html", selfcontained = TRUE)
+
+
+
 
 
 ```
