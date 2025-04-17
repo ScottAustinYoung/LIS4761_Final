@@ -93,10 +93,14 @@ print(paste("Filtered data saved to: Data/filtered_data.csv"))
 
 ```
 
+```{r, "Load Data"}
+# Load the filtered data ONCE after cleaning
+filtered_data <- read_csv("Data/filtered_data.csv", show_col_types = FALSE)
+```
+
 ## Association Rule Mining: Christopher Reddish, Scott Young
  
 ```{r, "Step 2"}
-filtered_data <- read_csv("Data/filtered_data.csv", show_col_types = FALSE)
 transactions_data <- filtered_data %>%
   group_by(Provider_Type, NPI) %>%
   summarize(HCPCS_Description = list(unique(HCPCS_Description)), .groups = "drop") %>%
@@ -122,7 +126,7 @@ clean_money <- function(x) {
 }
 
 # 1. Load and clean only the necessary columns
-df_raw <- read_csv("Data/filtered_data.csv", show_col_types = FALSE) %>%
+df_raw <- filtered_data %>%
   mutate(
     Total_Services = as.numeric(`Total_Services`),
     Avg_Submitted_Charge = clean_money(`Avg_Submitted_Charge`),
@@ -202,7 +206,7 @@ print(cluster_summary)
 ```{r, "Step 4"}
 ## Linear Regression (Step 4)
 # Load and clean with basic numeric conversion
-df_lm <- read_csv("Data/filtered_data.csv", show_col_types = FALSE) %>%
+df_lm <- filtered_data %>%
   select(
     Avg_Medicare_Payment,
     Total_Services,
@@ -256,7 +260,7 @@ summary(lm_model)
 shapefile_path <- "~/Data/tl_2010_12_zcta510.shp"
 
 # Load Medicare data
-medicare_cleaned <- read_csv("Data/filtered_data.csv", show_col_types = FALSE) %>%
+medicare_cleaned <- filtered_data %>%
   mutate(
     Provider_Zip = as.character(Provider_Zip),
     Avg_Medicare_Payment = as.numeric(gsub("[$,]", "", Avg_Medicare_Payment))
