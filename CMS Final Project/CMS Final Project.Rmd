@@ -102,7 +102,10 @@ filtered_data <- read_csv("Data/filtered_data.csv",
 # Helper function to clean monetary columns
 clean_money <- function(x) {
   as.numeric(gsub("[$,]", "", as.character(x)))
-}
+} 
+
+#tigirs enabled for kmeans web element
+options(tigris_use_cache = TRUE)
 ```
 
 ## Association Rule Mining: Christopher Reddish, Scott Young
