@@ -37,6 +37,10 @@ for (pkg in required_packages) {
     warning(sprintf("Package '%s' could not be loaded.", pkg))
   }
 }
+
+# Enable caching for tigris package
+options(tigris_use_cache = TRUE)
+
 ```
 
 ##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
@@ -104,8 +108,6 @@ clean_money <- function(x) {
   as.numeric(gsub("[$,]", "", as.character(x)))
 } 
 
-#tigirs enabled for kmeans web element
-options(tigris_use_cache = TRUE)
 ```
 
 ## Association Rule Mining: Christopher Reddish, Scott Young
