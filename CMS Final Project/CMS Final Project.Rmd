@@ -94,12 +94,10 @@ print(paste("Filtered data saved to: Data/filtered_data.csv"))
 ```
 ## Load Data Once and Custom Functions
 ```{r, "Load Data"}
-# Load the filtered data ONCE after cleaning
-filtered_data <- read_csv("Data/filtered_data.csv", 
-                          col_types = cols(FIPS_Code = col_character()))
-
-# Clean the FIPS_Code because it was giving error in k means column to remove non-numeric values
-filtered_data$FIPS_Code <- as.numeric(gsub("[^0-9]", "", filtered_data$FIPS_Code))
+# Load the filtered data ONCE after cleaning and take care of problems of FIPS code error
+filtered_data <- read_csv("Data/filtered_data.csv",
+                          col_types = cols(FIPS_Code = col_character())) %>%
+  mutate(FIPS_Code = as.numeric(gsub("[^0-9]", "", FIPS_Code)))
 
 # Helper function to clean monetary columns
 clean_money <- function(x) {
