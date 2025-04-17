@@ -23,7 +23,9 @@ required_packages <- c(
   "tigris",
   "scales",
   "htmlwidgets",
-  "jsonlite"
+  "jsonlite",
+  "purr",
+  "stringr"
 )
 
 # Install any packages that are not already installed
@@ -115,17 +117,39 @@ clean_money <- function(x) {
 ## Association Rule Mining: Christopher Reddish, Scott Young
  
 ```{r, "Step 2"}
-transactions_data <- filtered_data %>%
-  group_by(Provider_Type, NPI) %>%
-  summarize(HCPCS_Description = list(unique(HCPCS_Description)), .groups = "drop") %>%
-  ungroup() %>%
-  select(HCPCS_Description) %>%
-  pull()
-transactions <- as(transactions_data, "transactions")
+# Grouping of service "transactions" for each NPI provider
+transactions_all <- filtered_data %>%
+  group_by(NPI) %>%
+  summarize(items = list(unique(HCPCS_Code))) %>%
+  pull(items) %>%
+  as("transactions")
 
-rules <- apriori(transactions, parameter = list(supp = 0.01, conf = 0.5, minlen = 2))
-inspect(head(sort(rules, by = "lift"), 10))
-rules_df <- as(rules, "data.frame")
+# Mine association rules with the following parameters
+rules_all <- apriori(transactions_all, parameter = list(
+  support = 0.01,
+  confidence = 0.5,
+  minlen = 2
+))
+
+# Converts rules into a data.frame of the top 100 by lift value
+df_rules_all <- as(head(sort(rules_all, by = "lift"), 100), "data.frame")
+
+# Create a lookup table of each HCPCS description using their HCPCS Code
+desc_lookup <- filtered_data %>% select(HCPCS_Code, HCPCS_Description) %>% distinct()
+
+
+# Extract NPI code pairs from the mined rules and labels with HCPCS Descriptions
+FINAL_df_rules_all_labeled <- df_rules_all %>%
+  mutate(
+    lhs_codes = gsub("\\{(.*)\\} =>.*", "\\1", rules),
+    rhs_codes = gsub(".*=> \\{(.*)\\}", "\\1", rules)
+  ) %>%
+  separate_rows(lhs_codes, sep = ",") %>%
+  left_join(desc_lookup, by = c("lhs_codes" = "HCPCS_Code")) %>%
+  rename(lhs_desc = HCPCS_Description) %>%
+  separate_rows(rhs_codes, sep = ",") %>%
+  left_join(desc_lookup, by = c("rhs_codes" = "HCPCS_Code")) %>%
+  rename(rhs_desc = HCPCS_Description)
 ```
 
 
@@ -223,7 +247,7 @@ leaflet_map <- leaflet::leaflet(zip_cluster_sf) %>%
     opacity = 1
   )
 
-htmlwidgets::saveWidget(leaflet_map, "Medicare_Clusters_FL.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(leaflet_map, "Data/Medicare_Clusters_FL.html", selfcontained = TRUE)
 
 ```
 # Summary of Findings
