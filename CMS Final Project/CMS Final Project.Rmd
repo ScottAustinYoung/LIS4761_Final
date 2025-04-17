@@ -2,7 +2,7 @@
 title: "CMS Final Project"
 author: Christopher Reddish, Khushi Patel, Naomi Vaid, Sneh Patel, Scott Young,  and
   Steven Barden
-date: ""
+date: "04/20/2025"
 output: html_document
 ---
 
@@ -21,7 +21,7 @@ library(readr)
 ##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
 1. Filtering out Florida Data
 2. Adding Custom Labels for column
-3. Removing unwanted columns (needed)
+3. Removing unwanted columns 
 ```{r, "Step 1"}
 ## Step 1.1
 # Read CSV 
