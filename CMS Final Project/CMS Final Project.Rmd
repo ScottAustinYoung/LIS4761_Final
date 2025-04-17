@@ -31,8 +31,12 @@ if (length(to_install) > 0) {
   install.packages(to_install, dependencies = TRUE)
 }
 
-# Load all required packages
-invisible(lapply(required_packages, library, character.only = TRUE))
+# Load all required packages and check if successfully loaded
+for (pkg in required_packages) {
+  if (!require(pkg, character.only = TRUE)) {
+    warning(sprintf("Package '%s' could not be loaded.", pkg))
+  }
+}
 ```
 
 ##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
