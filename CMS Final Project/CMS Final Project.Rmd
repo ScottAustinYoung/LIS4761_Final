@@ -10,13 +10,29 @@ output: html_document
 
 ```{r, "Libraries"}
 # Add your library below.
-library(tidyverse)
-library(GGally)
-library(ggplot2)
-library(sf)
-library(dplyr)
-library(readr)
-library(arules)
+# List of required packages
+required_packages <- c(
+  "tidyverse",
+  "GGally",
+  "ggplot2",
+  "sf",
+  "dplyr",
+  "readr",
+  "arules",
+  "leaflet",
+  "tigris",
+  "scales",
+  "htmlwidgets"
+)
+
+# Install any packages that are not already installed
+to_install <- setdiff(required_packages, rownames(installed.packages()))
+if (length(to_install) > 0) {
+  install.packages(to_install, dependencies = TRUE)
+}
+
+# Load all required packages
+invisible(lapply(required_packages, library, character.only = TRUE))
 ```
 
 ##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
