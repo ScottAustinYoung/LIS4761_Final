@@ -130,7 +130,9 @@ rules_df <- as(rules, "data.frame")
 
 
 ## K-Means Clustering: Christopher Reddish, Sneh Patel
-# The primary goal of this analysis is to analyze Medicare provider data using k-means clustering, assign meaningful cluster labels to providers based on cost and service volume, and visualize the geographic distribution of these clusters across ZIP codes in Florida using an interactive map..
+# The primary goal of this analysis is to analyze Medicare provider data using k-means clustering,
+# assign meaningful cluster labels to providers based on cost and service volume, 
+# and visualize the geographic distribution of these clusters across ZIP codes in Florida using an interactive map..
 
 ```{r, "Step 3"}
 # ---- Step 3: K-Means Clustering ----
@@ -225,8 +227,8 @@ htmlwidgets::saveWidget(leaflet_map, "Medicare_Clusters_FL.html", selfcontained 
 
 ```
 # Summary of Findings
-# According to the provider statistics, Cluster 2 is the most common,
-# accounting for the majority of providers, while Cluster 3 is under-represented, implying potential clustering imbalances. 
+# According to the provider statistics, Cluster 2 is the most common, accounting for the majority of providers, 
+# while Cluster 3 is under-represented, implying potential clustering imbalances. 
 # Cluster 2 has a wide range of values for total services, average submitted charge, and average Medicare payment, 
 # with average Medicare payments at $70.23, average submitted charges at $356.84, and an average of 604 total services; 
 # however, Cluster 3 has higher costs and lower service volumes, with average Medicare payments at $425.36, 
