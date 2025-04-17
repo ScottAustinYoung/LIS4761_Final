@@ -22,7 +22,8 @@ required_packages <- c(
   "leaflet",
   "tigris",
   "scales",
-  "htmlwidgets"
+  "htmlwidgets",
+  "jsonlite"
 )
 
 # Install any packages that are not already installed
