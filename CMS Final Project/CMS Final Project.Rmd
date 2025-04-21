@@ -24,8 +24,10 @@ required_packages <- c(
   "scales",
   "htmlwidgets",
   "jsonlite",
-  "purr",
-  "stringr"
+  "purrr",
+  "stringr",
+  "lme4",
+  "broom.mixed"
 )
 
 # Install any packages that are not already installed
@@ -310,19 +312,118 @@ df_lm <- filtered_data %>%
     RUCA_Description = factor(RUCA_Description)
   ) %>%
   select(-Avg_Medicare_Payment, -Total_Services, -Avg_Submitted_Charge, -Total_Beneficiaries, -Provider_Type) %>%
-  drop_na()
+  filter(Medicare_Payment > 1.00) %>%
+  mutate(
+    Log_Medicare_Payment = log(Medicare_Payment)
+  ) %>%
+  filter(is.finite(Log_Medicare_Payment)) %>%
+  mutate(
+    across(c(Services, Submitted_Charge, Beneficiaries),
+           list(z = ~scale(.)),
+           .names = "{.col}_z")
+  ) %>%
+  group_by(Specialty) %>%
+  filter(n() >= 50) %>%
+  ungroup %>%
+  drop_na() %>%
+  select(
+    Log_Medicare_Payment,
+    Services_z, Submitted_Charge_z, Beneficiaries_z,
+    Place_Of_Service, RUCA_Description,
+    Specialty
+  )
 
 # Run simplified regression (removed HCPCS_Description)
-lm_model <- lm(
-  Medicare_Payment ~ Services + Submitted_Charge + Beneficiaries + 
-    Place_Of_Service + Specialty + RUCA_Description,
-  data = df_lm
+mixed_model <- lmer(
+  Log_Medicare_Payment ~ Services_z + Submitted_Charge_z + Beneficiaries_z +
+    Place_Of_Service + RUCA_Description +
+    (1 | Specialty),
+  data = df_lm,
 )
 
 # View results
-summary(lm_model)
+summary(mixed_model)
 
-# Output the model
+# Key fixed effect drivers
+fixed_effects <- tidy(mixed_model,
+                      effects = "fixed",
+                      conf.int = TRUE)
+
+plot_data_fixed <- fixed_effects %>%
+    filter(term %in% c("Submitted_Charge_z", "Place_Of_ServiceO")) %>%
+  mutate(
+    # Create clearer names for the plot axis
+    term_cleaned = case_when(
+      term == "Submitted_Charge_z" ~ "Submitted Charge Impact",
+      term == "Place_Of_ServiceO" ~ "Office vs. Facility Impact",
+      TRUE ~ term
+    )
+  )
+
+plot_key_drivers <- ggplot(plot_data_fixed, aes(x = estimate, y = reorder(term_cleaned, estimate))) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey70") +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.15, linewidth = 0.7) +
+    geom_point(size = 3.5, color = "dodgerblue") +
+    labs(
+      title = "Key Factors Influencing Average Medicare Payment",
+      subtitle = "Estimated Impact (Positive or Negative)",
+      x = "Estimated Impact on Medicare Payment",
+      y = "Factor"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(panel.grid.major.y = element_blank())
+
+ggsave("Output/plot_key_drivers_opaque.png",
+       plot = plot_key_drivers,
+       width = 8,
+       height = 4,
+       bg = "white"
+)
+ggsave("Output/plot_key_drivers_transparent.png",
+       plot = plot_key_drivers,
+       width = 8,
+       height = 4
+)
+
+
+# Variation between specialties
+specialty_effects <- ranef(mixed_model,
+                           condVar = FALSE)$Specialty %>%
+  rename(Intercept_Deviation = `(Intercept)`) %>%
+  tibble::rownames_to_column("Specialty")
+
+plot_specialty_variation <- ggplot(specialty_effects, aes(x = Intercept_Deviation, y = reorder(Specialty, Intercept_Deviation))) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey70") +
+  geom_point(size = 2, color = "forestgreen") +
+  labs(
+    title = "Variation in Baseline Payments Across Specialties",
+    subtitle = "Deviation from Average Baseline Medicare Payment",
+    x = "Estimated Deviation from Average Baseline (Medicare Payment)",
+    y = "Medical Specialty"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+     axis.text.y = element_text(size = 8),
+     panel.grid.major.y = element_blank()
+  )
+
+ggsave(
+    "Output/plot_specialty_variation_opaque.png",
+    plot = plot_specialty_variation,
+    width = 12,
+    height = 15,
+    units = "in",
+    dpi = 300,
+    bg = "white"
+)
+ggsave(
+    "Output/plot_specialty_variation_transparent.png",
+    plot = plot_specialty_variation,
+    width = 12,
+    height = 15,
+    units = "in",
+    dpi = 300
+)
 ```
 # The linear model uses Services, Submitted_Charge, and Beneficiaries as the numeric predictors.
 # The categorical predictors are Place_Of_Srvc, Specialty, and RUCA_Desc.
@@ -357,11 +458,11 @@ zcta <- st_read(shapefile_path) %>%
   mutate(ZCTA5CE10 = as.character(ZCTA5CE10))
 
 # Choose specialty
-selected_speciality <- "Internal Medicine"
+selected_specialty <- "Internal Medicine"
 
 # Filter and summarize
 hm_filtered_data <- medicare_cleaned %>%
-  filter(Provider_Type == selected_speciality) %>%
+  filter(Provider_Type == selected_specialty) %>%
   group_by(Provider_Zip) %>%
   summarize(
     Avg_Payment = mean(Avg_Medicare_Payment, na.rm = TRUE),
@@ -390,7 +491,7 @@ tampa_plot <- ggplot(data = tampa_map_data) +
   ) +
   labs(
     title = "Medicare Average Payment by ZIP Code in Tampa Bay",
-    subtitle = paste("Speciality:", selected_speciality),
+    subtitle = paste("Specialty:", selected_specialty),
   ) +
   theme_minimal(base_size = 14) +
   theme(
