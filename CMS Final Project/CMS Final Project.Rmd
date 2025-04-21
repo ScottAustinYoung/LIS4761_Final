@@ -390,7 +390,7 @@ tampa_plot <- ggplot(data = tampa_map_data) +
   ) +
   labs(
     title = "Medicare Average Payment by ZIP Code in Tampa Bay",
-    subtitle = paste("Speciality:", selected_specialty),
+    subtitle = paste("Speciality:", selected_speciality),
   ) +
   theme_minimal(base_size = 14) +
   theme(
