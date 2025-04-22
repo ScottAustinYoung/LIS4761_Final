@@ -158,7 +158,7 @@ clean_money <- function(x) {
 ```
 # Association Rule Mining: Christopher Reddish, Scott Young
 ```{r, "Arules"}
-rmarkdown::render("aruleSmarkdown.Rmd")
+rmarkdown::render("Arules.Rmd")
 ```
 ## Summary of findings
 
