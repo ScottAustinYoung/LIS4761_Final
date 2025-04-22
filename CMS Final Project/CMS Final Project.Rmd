@@ -156,57 +156,9 @@ clean_money <- function(x) {
 }
 
 ```
-
 # Association Rule Mining: Christopher Reddish, Scott Young
-## Model 1.
-
-## Model 2.
-The primary goal of this model is to see which bundled services are most often rendered depending on the associated NPI code.
-1. Filters the data further by grouping all NPI codes and creation of a list associated with HCPCS codes.
-2. Creation of association rules with low parameters to catch as much data as possible.
-3. Creation of a dataframe to hold the top 100 mined rules by life.
-4. Creation of a table that assigns HCPCS codes to their matching description.
-5. Creation of the final Apriori dataframe.
-6. Writing the mined rules to a .csv.
-```{r, "Step 2"}
-### Model 1: by Christopher Reddish
-
-### Model 2: Grouping by NPI compared against HCPCS codes by Scott Young
-# Grouping of service "transactions" for each NPI provider
-transactions_all <- filtered_data %>%
-  group_by(NPI) %>%
-  summarize(items = list(unique(HCPCS_Code))) %>%
-  pull(items) %>%
-  as("transactions")
-
-# Mine association rules with the following parameters
-rules_all <- apriori(transactions_all, parameter = list(
-  support = 0.01,
-  confidence = 0.5,
-  minlen = 2
-))
-
-# Converts rules into a data.frame of the top 100 by lift value
-df_rules_all <- as(head(sort(rules_all, by = "lift"), 100), "data.frame")
-
-# Create a lookup table of each HCPCS description using their HCPCS Code
-desc_lookup <- filtered_data %>% select(HCPCS_Code, HCPCS_Description) %>% distinct()
-
-
-# Extract NPI code pairs from the mined rules and labels with HCPCS Descriptions
-df_Apriori_NPI_HCPCS_Code<- df_rules_all %>%
-  mutate(
-    lhs_codes = gsub("\\{(.*)\\} =>.*", "\\1", rules),
-    rhs_codes = gsub(".*=> \\{(.*)\\}", "\\1", rules)
-  ) %>%
-  separate_rows(lhs_codes, sep = ",") %>%
-  left_join(desc_lookup, by = c("lhs_codes" = "HCPCS_Code")) %>%
-  rename(lhs_desc = HCPCS_Description) %>%
-  separate_rows(rhs_codes, sep = ",") %>%
-  left_join(desc_lookup, by = c("rhs_codes" = "HCPCS_Code")) %>%
-  rename(rhs_desc = HCPCS_Description)
-
-write.csv(df_Apriori_NPI_HCPCS_Code, "Data/df_Apriori_NPI_HCPCS_Code.csv", row.names = FALSE)
+```{r, "Arules"}
+rmarkdown::render("aruleSmarkdown.Rmd")
 ```
 ## Summary of findings
 
