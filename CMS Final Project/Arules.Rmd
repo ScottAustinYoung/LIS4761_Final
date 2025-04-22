@@ -1,0 +1,328 @@
+---
+title: "Medicare Association Rule Mining & Audit Flagging"
+author: "Christopher Reddish"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+required_packages <- c("dplyr", "readr", "arules", "ggplot2", "ggrepel","purrr", "tibble")
+to_install <- setdiff(required_packages, rownames(installed.packages()))
+if (length(to_install) > 0) install.packages(to_install)
+lapply(required_packages, require, character.only = TRUE)
+```
+
+## 📘 Introduction
+
+This project detects potentially suspicious billing behavior among Medicare providers in the Tampa Bay area. Using association rule mining and a composite scoring model, it flags providers who may warrant audit review.
+
+---
+
+## 🔹 Step 1: Clean and Prepare Data
+
+```{r step-1-clean-data}
+filtered_data <- read.csv("filtered_data.csv")
+
+clean_df <- filtered_data %>%
+  filter(
+    !is.na(Provider_Type),
+    !is.na(HCPCS_Code),
+    !is.na(NPI),
+    as.numeric(Avg_Medicare_Payment) >= 10
+  ) %>%
+  mutate(
+    NPI = as.character(NPI),
+    HCPCS_Code = as.character(HCPCS_Code),
+    Provider_Type = as.factor(trimws(Provider_Type))
+  ) %>%
+  select(NPI, HCPCS_Code, Avg_Medicare_Payment, Provider_Type, Provider_Last_Name)
+
+```
+
+## 🔹 Step 2: Generate Association Rules by Specialty
+
+
+```{r step-2-rules-mining, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+# Initialize lists to store results
+all_rule_matches <- tibble()      # For NPI-rule match scoring in Step 3
+provider_summary_list <- list()   # For rule-based provider summaries
+
+# Step 2A: Split the dataset by specialty (Provider_Type)
+specialty_groups <- clean_df %>%
+  group_by(Provider_Type) %>%
+  group_split()
+
+# Step 2B: Loop through each specialty subset
+for (spec_df in specialty_groups) {
+  spec_name <- as.character(unique(spec_df$Provider_Type))
+  if (nrow(spec_df) < 2) next
+
+  # Step 2C: Convert each NPI into a transaction of billed HCPCS codes
+  provider_tx <- spec_df %>%
+    group_by(NPI) %>%
+    summarise(items = list(unique(HCPCS_Code)), .groups = "drop")
+
+  tx_list <- lapply(split(provider_tx$items, provider_tx$NPI), unlist)
+  if (length(tx_list) < 2) next
+
+  trans <- as(tx_list, "transactions")
+
+  # Step 2D: Generate association rules for this specialty
+  rules <- apriori(trans, parameter = list(supp = 0.02, conf = 0.7, maxlen = 2))
+  if (length(rules) == 0) next
+
+  # Step 2E: Filter rules by lift and convert to data frame
+  rules_df_raw <- as(rules, "data.frame")
+  rules_df_filtered <- rules_df_raw %>% filter(lift >= 2)
+  if (nrow(rules_df_filtered) == 0) next
+
+  # Add readable labels and parse rule structure for each rule
+  rules_df_filtered$lhs <- labels(lhs(rules))[as.integer(rownames(rules_df_filtered))]
+  rules_df_filtered$rhs <- labels(rhs(rules))[as.integer(rownames(rules_df_filtered))]
+  rules_df_filtered <- rules_df_filtered %>%
+    mutate(
+      rule_label = paste(lhs, "=>", rhs),
+      lhs_items = strsplit(gsub("[{}]", "", lhs), ","),
+      rhs_items = strsplit(gsub("[{}]", "", rhs), ","),
+      all_items = map2(lhs_items, rhs_items, ~ unique(trimws(c(.x, .y))))
+    )
+
+  # Step 2F: Match rules to providers
+  provider_rule_map <- list()
+  npi_rule_log <- tibble()
+
+  for (npi in names(tx_list)) {
+    provider_items <- tx_list[[npi]]
+
+    matched <- rules_df_filtered %>%
+      filter(map_lgl(all_items, ~ all(.x %in% provider_items)))
+
+    if (nrow(matched) > 0) {
+      provider_rule_map[[npi]] <- matched$rule_label
+
+      npi_rule_log <- bind_rows(npi_rule_log, tibble(
+        NPI = npi,
+        Rule_Label = matched$rule_label,
+        Lift = matched$lift,
+        Confidence = matched$confidence
+      ))
+    }
+  }
+
+  # Step 2G: Create provider summary stats for rule match counts
+  if (length(provider_rule_map) > 0) {
+    provider_summary <- tibble(
+      Specialty = spec_name,
+      NPI = names(provider_rule_map),
+      Total_Rules = sapply(provider_rule_map, function(x) length(unique(x)))
+    )
+
+    hcpcs_diversity <- spec_df %>%
+      group_by(NPI) %>%
+      summarise(Unique_Codes = n_distinct(HCPCS_Code), .groups = "drop")
+
+    provider_summary <- provider_summary %>%
+      left_join(hcpcs_diversity, by = "NPI") %>%
+      mutate(
+        Rules_Per_Code = round(Total_Rules / Unique_Codes, 2),
+        Unique_Codes_Per_Rule = round(Unique_Codes / Total_Rules, 4)
+      )
+
+    provider_summary_list[[spec_name]] <- provider_summary
+    all_rule_matches <- bind_rows(all_rule_matches, npi_rule_log)
+  }
+}
+
+# Export objects for Step 3
+final_provider_results <- bind_rows(provider_summary_list)
+npi_rule_scores <- all_rule_matches %>%
+  group_by(NPI) %>%
+  summarise(
+    mean_lift = mean(Lift, na.rm = TRUE),
+    mean_confidence = mean(Confidence, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+```
+
+## 🔹 Step 3:  Step 3A: Merge all provider summaries across specialties into one dataset
+
+```{r step-3-scoring}
+# Step 3A: Merge rule-based stats into the full cleaned Medicare dataset
+merged_df <- clean_df %>%
+  left_join(final_provider_results, by = "NPI")
+
+# Step 3B: Append average lift and confidence per provider from rule matches
+scored_providers <- merged_df %>%
+  left_join(npi_rule_scores, by = "NPI")
+
+# Step 3C: Z-score standardization for Rules_Per_Code within each specialty
+scored_providers <- scored_providers %>%
+  group_by(Provider_Type) %>%
+  mutate(Z_Score_RPC = as.numeric(scale(Rules_Per_Code))) %>%
+  ungroup()
+
+# Step 3D: Compute a composite audit score
+# This blends:
+#   - billing repetition
+#   - rule lift
+#   - rule confidence
+#   - average Medicare payout
+#   - relative specialty behavior
+scored_providers <- scored_providers %>%
+  mutate(
+    Composite_Audit_Score = round(
+      (coalesce(Rules_Per_Code, 0) * 1.5) +
+      (coalesce(mean_lift, 0) * 2.0) +
+      (coalesce(mean_confidence, 0) * 1.0) +
+      (coalesce(Avg_Medicare_Payment, 0) / 100) +
+      coalesce(Z_Score_RPC, 0),
+      2
+    )
+  )
+
+# Step 3E: Append sample size per provider for audit traceability
+scored_providers <- scored_providers %>%
+  group_by(NPI) %>%
+  mutate(Sample_Size = n()) %>%
+  ungroup()
+
+```
+
+## 🔹 Step 4: Risk Stratification & Visualization
+
+```{r step-4-risk-visualization, fig.width=18, fig.height=11}
+# Step 4A: Flag audit risk levels using percentile thresholds
+# ------------------------------------------------------------
+# We classify providers within each specialty based on Composite Score:
+# - Top 2% = Extreme High Risk
+# - 92–98% = High Risk
+# - 80–92% = Moderate Risk
+# - Bottom 80% = Low/No Risk
+
+scored_flagged <- scored_providers %>%
+  group_by(Provider_Type) %>%
+  mutate(
+    p80 = quantile(Composite_Audit_Score, 0.80, na.rm = TRUE),
+    p92 = quantile(Composite_Audit_Score, 0.92, na.rm = TRUE),
+    p98 = quantile(Composite_Audit_Score, 0.98, na.rm = TRUE),
+    Audit_Flag = case_when(
+      Composite_Audit_Score >= p98 ~ "Extreme High Risk (98–100%)",
+      Composite_Audit_Score >= p92 ~ "High Risk (92–98%)",
+      Composite_Audit_Score >= p80 ~ "Moderate Risk (80–92%)",
+      TRUE                         ~ "Low/No Risk (0–80%)"
+    )
+  ) %>%
+  ungroup()
+
+# Step 4B: Filter to valid (non-NA, >0) composite scores
+valid_scores_df <- scored_flagged %>%
+  filter(!is.na(Composite_Audit_Score), Composite_Audit_Score > 0)
+
+# Step 4C: Manually set your "Top 15 Most Interesting" specialties
+top15_specialties <- c(
+  "Anesthesiology", "Cardiology", "Dermatology", "Diagnostic Radiology",
+  "Emergency Medicine", "Family Practice", "Gastroenterology", "General Surgery",
+  "Internal Medicine", "Interventional Cardiology", "Nurse Practitioner",
+  "Orthopedic Surgery", "Physician Assistant", "Podiatry", "Vascular Surgery"
+)
+
+# Step 4D: Filter only the specialties of interest and cap extreme outliers
+volume_filtered_df <- valid_scores_df %>%
+  filter(
+    Provider_Type %in% top15_specialties,
+    Composite_Audit_Score <= quantile(Composite_Audit_Score, 0.99, na.rm = TRUE),
+    Avg_Medicare_Payment <= 1000
+  )
+
+# Step 4E: Generate plot with fixed x and y axis, no log scale
+composite_plot <- ggplot(volume_filtered_df, aes(
+  x = Avg_Medicare_Payment,
+  y = Composite_Audit_Score,
+  color = Audit_Flag
+)) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~ Provider_Type, scales = "fixed", nrow = 5) +
+  scale_color_manual(
+    values = c(
+      "Extreme High Risk (98–100%)" = "purple",
+      "High Risk (92–98%)" = "red",
+      "Moderate Risk (80–92%)" = "gold",
+      "Low/No Risk (0–80%)" = "green"
+    )
+  ) +
+  scale_x_continuous(
+    labels = scales::dollar_format(),
+    breaks = c(0, 250, 500, 750, 1000),
+    limits = c(0, 1000)
+  ) +
+  scale_y_continuous(
+    limits = c(0, 85),
+    breaks = seq(0, 80, by = 20)
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(strip.text = element_text(size = 10)) +
+  labs(
+    title = "Composite Audit Score vs. Medicare Payment",
+    subtitle = "Top 15 Most Interesting Specialties – Risk Segmentation at 80/92/98 Percentiles",
+    x = "Average Medicare Payment ($)",
+    y = "Composite Audit Score",
+    color = "Audit Risk Level"
+  )
+
+# Step 4F: Save output as PNG
+ggsave("Top15_Composite_vs_Payment_BySpecialty_FIXEDAXIS.png",
+       plot = composite_plot, dpi = 300, width = 14, height = 9)
+
+# Step 4G: Render in output
+composite_plot
+
+```
+
+## 🔹 Step 5: Top Providers Report
+
+```{r step-5-top-providers}
+# Step 5A: Join Provider_Last_Name from filtered_data, and rename it cleanly
+scored_named <- scored_providers %>%
+  left_join(
+    filtered_data %>%
+      mutate(NPI = as.character(NPI)) %>%
+      select(NPI, Provider_Last_Name),
+    by = "NPI"
+  ) %>%
+  rename(Provider_Last_Name = Provider_Last_Name.y)  # in case it became .y
+
+# Step 5B: Top 50 providers overall
+top50_overall <- scored_named %>%
+  distinct(NPI, .keep_all = TRUE) %>%
+  arrange(desc(Composite_Audit_Score)) %>%
+  slice_head(n = 50)
+
+# Display Top 50 Table
+knitr::kable(
+  top50_overall %>%
+    select(Provider_Last_Name, NPI, Provider_Type, Composite_Audit_Score),
+  caption = "Top 50 Providers Overall by Composite Audit Score"
+)
+
+# Step 5C: Get Top 3 Providers by Specialty without repeating NPIs
+top3_by_specialty <- scored_named %>%
+  filter(!is.na(Composite_Audit_Score)) %>%
+  group_by(Provider_Type, NPI) %>%
+  slice_max(order_by = Composite_Audit_Score, n = 1) %>%  # get max score per NPI
+  ungroup() %>%
+  distinct(NPI, .keep_all = TRUE) %>%                     # remove any duplicate NPIs
+  group_by(Provider_Type) %>%
+  slice_max(order_by = Composite_Audit_Score, n = 3) %>%  # now take top 3 per specialty
+  ungroup()
+
+# Display Top 3 Per Specialty Table
+knitr::kable(
+  top3_by_specialty %>%
+    select(Provider_Type, Provider_Last_Name, NPI, Composite_Audit_Score),
+  caption = "Top 3 Providers by Composite Score in Each Specialty"
+)
+
+```
