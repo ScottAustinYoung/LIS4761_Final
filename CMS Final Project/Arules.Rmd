@@ -23,7 +23,7 @@ This project detects potentially suspicious billing behavior among Medicare prov
 ## 🔹 Step 1: Clean and Prepare Data
 
 ```{r step-1-clean-data}
-filtered_data <- read.csv("filtered_data.csv")
+filtered_data <- read.csv("Data/filtered_data.csv")
 
 clean_df <- filtered_data %>%
   filter(
