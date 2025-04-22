@@ -1,13 +1,26 @@
 ---
 title: "CMS Final Project"
-author: Christopher Reddish, Khushi Patel, Naomi Vaid, Sneh Patel, Scott Young,  and
-  Steven Barden
-date: "04/20/2025"
-output: html_document
+author:
+  - Christopher Reddish
+  - Khushi Patel
+  - Naomi Vaid
+  - Sneh Patel
+  - Scott Young
+  - Steven Barden
+date: "04/27/2025"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    numbered_sections: true
+    theme: readable
 ---
 
-## Introduction
+# Introduction
+This project analyzes Medicare provider data for the Tampa Bay region to understand service patterns, cost structures, and geopgraphic distributions. We utilize association rule mining, k-means clustering, linear regression, and geospatial visualization to explore relationships within the data. The primary data source is the CMS Medicare Provider Utilization and Payment Data Public Use File. Our goal is to identify key trends and factors influencing healthcare delivery and costs in this specific geographic area.
 
+# Setup: Loading Libraries and Data
+## Load Required Libraries
 ```{r, "Libraries"}
 # Add your library below.
 # List of required packages
@@ -48,10 +61,14 @@ options(tigris_use_cache = TRUE)
 
 ```
 
-##Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish
-1. Filtering out Florida Data
-2. Adding Custom Labels for column
-3. Removing unwanted columns 
+# Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish, and Scott Young
+1. Assigning Tampa Bay regional ZIP codes to a variable.
+2. Reading in the initial dataset.
+3. Adjusting misinputs on the initial dataset.
+4. Filter the data by Tampa Bay ZIP codes.
+5. Renaming the columns.
+6. Writing the dataset to a usable .csv.
+7. Printing where the file was written to.
 ```{r, "Step 1"}
 ## Step 1.1
 # Tampa Bay ZIP codes
@@ -123,7 +140,9 @@ write.csv(filtered_data, "Data/filtered_data.csv", row.names = FALSE)
 print(paste("Filtered data saved to: Data/filtered_data.csv"))
 
 ```
-## Load Data Once and Custom Functions
+# Load Data Once and Custom Functions
+1. Read in the filtered .csv file for easier use without having to load the initial dataset.
+2. Creation of a custom function for use in K-Means Clustering.
 ```{r, "Load Data"}
 #Load the filtered data ONCE after cleaning and take care of problems of FIPS code error and zip map for k-mean map
 filtered_data <- read_csv("Data/filtered_data.csv",
@@ -138,10 +157,21 @@ clean_money <- function(x) {
 
 ```
 
-## Association Rule Mining: Christopher Reddish, Scott Young
- 
+# Association Rule Mining: Christopher Reddish, Scott Young
+## Model 1.
+
+## Model 2.
+The primary goal of this model is to see which bundled services are most often rendered depending on the associated NPI code.
+1. Filters the data further by grouping all NPI codes and creation of a list associated with HCPCS codes.
+2. Creation of association rules with low parameters to catch as much data as possible.
+3. Creation of a dataframe to hold the top 100 mined rules by life.
+4. Creation of a table that assigns HCPCS codes to their matching description.
+5. Creation of the final Apriori dataframe.
+6. Writing the mined rules to a .csv.
 ```{r, "Step 2"}
-### Model 1: Grouping by NPI compared against HCPCS codes
+### Model 1: by Christopher Reddish
+
+### Model 2: Grouping by NPI compared against HCPCS codes by Scott Young
 # Grouping of service "transactions" for each NPI provider
 transactions_all <- filtered_data %>%
   group_by(NPI) %>%
@@ -176,14 +206,12 @@ df_Apriori_NPI_HCPCS_Code<- df_rules_all %>%
   left_join(desc_lookup, by = c("rhs_codes" = "HCPCS_Code")) %>%
   rename(rhs_desc = HCPCS_Description)
 
-write.csv(df_Apriori_NPI_HCPCS_Code, "df_Apriori_NPI_HCPCS_Code.csv", row.names = FALSE)
+write.csv(df_Apriori_NPI_HCPCS_Code, "Data/df_Apriori_NPI_HCPCS_Code.csv", row.names = FALSE)
 ```
+## Summary of findings
 
-
-## K-Means Clustering: Christopher Reddish, Sneh Patel
-# The primary goal of this analysis is to analyze Medicare provider data using k-means clustering,
-# assign meaningful cluster labels to providers based on cost and service volume, 
-# and visualize the geographic distribution of these clusters across ZIP codes in Florida using an interactive map..
+# K-Means Clustering: Christopher Reddish, Sneh Patel
+The primary goal of this analysis is to analyze Medicare provider data using k-means clustering, assign meaningful cluster labels to providers based on cost and service volume, and visualize the geographic distribution of these clusters across ZIP codes in Florida using an interactive map.
 
 ```{r, "Step 3"}
 # ---- Step 3: K-Means Clustering ----
@@ -277,18 +305,19 @@ leaflet_map <- leaflet::leaflet(zip_cluster_sf) %>%
 htmlwidgets::saveWidget(leaflet_map, "Output/Medicare_Clusters_FL.html", selfcontained = TRUE)
 
 ```
-# Summary of Findings
-# According to the provider statistics, Cluster 2 is the most common, accounting for the majority of providers, 
-# while Cluster 3 is under-represented, implying potential clustering imbalances. 
-# Cluster 2 has a wide range of values for total services, average submitted charge, and average Medicare payment, 
-# with average Medicare payments at $70.23, average submitted charges at $356.84, and an average of 604 total services; 
-# however, Cluster 3 has higher costs and lower service volumes, with average Medicare payments at $425.36, 
-# average submitted charges at $4,490.86, and an average of 29 total services.
-# These findings indicate that the clustering technique should be reconsidered, possibly using new algorithms or feature engineering, 
-# as well as a more rigorous outlier analysis within Cluster 2 to assess whether some providers should be reclassified in order to establish more distinct and balanced groups.
+## Summary of Findings
+According to the provider statistics, Cluster 2 is the most common, accounting for the majority of providers,
+while Cluster 3 is under-represented, implying potential clustering imbalances. Cluster 2 has a wide range of values for total services, average submitted charge, and average Medicare payment, with average Medicare payments at $70.23, average submitted charges at $356.84, and an average of 604 total services; however, Cluster 3 has higher costs and lower service volumes, with average Medicare payments at $425.36, average submitted charges at $4,490.86, and an average of 29 total services. These findings indicate that the clustering technique should be reconsidered, possibly using new algorithms or feature engineering, as well as a more rigorous outlier analysis within Cluster 2 to assess whether some providers should be reclassified in order to establish more distinct and balanced groups.
 
-## Linear Regression: Steven Barden, Scott Young
- 
+# Linear Regression: Steven Barden, Scott Young
+ The primary goal of this methodology is to identify and understand factors influencing average Medicare payments.
+ 1. Creation of a dataframe to be used within this section for linear regression/linear mixed-effects.
+ 2. Creation of the model that compares logarithmic Medicare payements to scaled statistics of various factors.
+ 3. Print of a summary of the model's findings.
+ 4. Creation of a dataframe that narrows down key drivers after analyzing the model's summary.
+ 5. Creation of a key drivers plot.
+ 6. Creation of a dataframe that lists each specialty.
+ 7. Creation of a plot that maps each specialty to their impact on Medicare payment costs.
 ```{r, "Step 4"}
 ## Linear Regression (Step 4)
 # Load and clean with basic numeric conversion
@@ -425,21 +454,11 @@ ggsave(
     dpi = 300
 )
 ```
-# The linear model uses Services, Submitted_Charge, and Beneficiaries as the numeric predictors.
-# The categorical predictors are Place_Of_Srvc, Specialty, and RUCA_Desc.
-# The R-squared value of the model is 0.6486, which explains a 65%~ variation in Medicare_Payment.
-# The F-statistic & P-values are both quite high, indicating a statistically significant model.
-# The average error stands at about $176.
-# As the Services increase, the average Medicare_Payment slightly decreases which tells that dense facilities reflect an economy-of-scale factor.
-# The strongest predictor is the Submitted_Charge value, in which higher billed values raises Medicare payments, as is obvious.
-# Beneficiaries stands as not significant, meaning the amount of people receiving service does not influence costs.
-# Place_Of_Srvc0, in an office setting, has a high p-value of $20.20. This stands to reason that smaller facilities are associated with a higher cost.
-# In terms of other categorical variables and their effect, Specialty has a range of types in which costs are reduced or increased on average.
-## Increases include: Ambulance Service Provider, Oral Surgery, Peripheral Vascular Disease, and Micrographic Dermatologic Surgery.
-## Decreases include: CRN and Anesthesiology.
-# RUCA_Desc has the following takeaways: Micropolitan areas receive less payment, Secondary flow to large urbanized areas has a higher payment.
+## Summary of Findings
+After analyzing 170,000 Medicare claims across the Tampa Bay area, this statistical model identifies key payment drivers. It uses a linear mixed-effects methodology that is a subset of linear regression to find differences between 76 different provider types while accounting for average charge amounts.
 
-## Heat Map Visual: Khushi Patel, Naomi Vaid
+
+# Heat Map Visual: Khushi Patel, Naomi Vaid
  
 ```{r, "Step 5"}
 
@@ -500,6 +519,8 @@ tampa_plot <- ggplot(data = tampa_map_data) +
     plot.subtitle = element_text(size = 13),
     plot.caption = element_text(size = 10, face = "italic")
   )
+# Print map
+tampa_plot
 
 # Save the heat map to the output folder
 ggsave(
