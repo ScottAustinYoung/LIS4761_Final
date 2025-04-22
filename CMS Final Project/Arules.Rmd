@@ -26,6 +26,9 @@ This project detects potentially suspicious billing behavior among Medicare prov
 filtered_data <- read.csv("Data/filtered_data.csv")
 
 clean_df <- filtered_data %>%
+  mutate(
+    Avg_Medicare_Payment = as.numeric(Avg_Medicare_Payment)
+  ) %>%
   filter(
     !is.na(Provider_Type),
     !is.na(HCPCS_Code),
@@ -177,7 +180,7 @@ scored_providers <- scored_providers %>%
       (coalesce(Rules_Per_Code, 0) * 1.5) +
       (coalesce(mean_lift, 0) * 2.0) +
       (coalesce(mean_confidence, 0) * 1.0) +
-      (coalesce(Avg_Medicare_Payment, 0) / 100) +
+      (coalesce(as.numeric(Avg_Medicare_Payment, 0) / 100)) +
       coalesce(Z_Score_RPC, 0),
       2
     )

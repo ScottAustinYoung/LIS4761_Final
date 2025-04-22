@@ -99,7 +99,7 @@ filtered_data <- read_csv("Data/Medicare_dataset.csv", show_col_types = FALSE) %
   filter(grepl("^\\d+$", Rndrng_Prvdr_Zip5)) %>%
   mutate(Rndrng_Prvdr_Zip5 = as.numeric(Rndrng_Prvdr_Zip5)) %>%
 # Filter by Tampa Bay ZIP codes
-  filter(Rndrng_Prvdr_Zip5 %in% tampa_bay_zips) %>% 
+  filter(Rndrng_Prvdr_Zip5 %in% tampa_bay_zips) %>%
 # Rename columns to be more immediately understandable  
   rename(
     NPI = Rndrng_NPI,
@@ -131,6 +131,12 @@ filtered_data <- read_csv("Data/Medicare_dataset.csv", show_col_types = FALSE) %
     Avg_Medicare_Payment = Avg_Mdcr_Pymt_Amt,
     Avg_Medicare_Standardized_Amt = Avg_Mdcr_Stdzd_Amt
   ) %>%
+    mutate(
+    across(
+      .cols = c(Avg_Medicare_Payment, Avg_Medicare_Allowed, Avg_Submitted_Charge, Avg_Medicare_Standardized_Amt),
+      .fns = ~ gsub("\\$", "", as.character(.))
+      )
+    ) %>%
   select(-Provider_First_Name, -Provider_MI)
 
 # Save the filtered data to a new CSV in the 'data' folder
@@ -140,21 +146,13 @@ write.csv(filtered_data, "Data/filtered_data.csv", row.names = FALSE)
 print(paste("Filtered data saved to: Data/filtered_data.csv"))
 
 ```
-# Load Data Once and Custom Functions
+# Load Data Once
 1. Read in the filtered .csv file for easier use without having to load the initial dataset.
-2. Creation of a custom function for use in K-Means Clustering.
 ```{r, "Load Data"}
 #Load the filtered data ONCE after cleaning and take care of problems of FIPS code error and zip map for k-mean map
 filtered_data <- read_csv("Data/filtered_data.csv",
                           col_types = cols(FIPS_Code = col_character())) %>%
   mutate(FIPS_Code = as.numeric(gsub("[^0-9]", "", FIPS_Code)), Provider_Zip = sprintf("%05s", as.character(Provider_Zip)))
-
-
-# Helper function to clean monetary columns
-clean_money <- function(x) {
-  as.numeric(gsub("[$,]", "", as.character(x)))
-}
-
 ```
 # Association Rule Mining: Christopher Reddish, Scott Young
 ```{r, "Arules"}
@@ -171,11 +169,12 @@ The primary goal of this analysis is to analyze Medicare provider data using k-m
 # K-Means Clustering
 df_raw <- filtered_data %>%
   mutate(
-    Total_Services = as.numeric(Total_Services),
-    Avg_Submitted_Charge = clean_money(Avg_Submitted_Charge),
-    Avg_Medicare_Payment = clean_money(Avg_Medicare_Payment)
+    across(
+      .cols = c(Total_Services, Avg_Submitted_Charge, Avg_Medicare_Payment),
+      .fns = ~as.numeric(as.character(.))
+    )
   ) %>%
-  select(Total_Services, Avg_Submitted_Charge, Avg_Medicare_Payment) %>%
+  select(NPI, Total_Services, Avg_Submitted_Charge, Avg_Medicare_Payment) %>%
   na.omit()
 
 stopifnot(all(sapply(df_raw, is.numeric)))
@@ -205,12 +204,22 @@ zcta_shapes <- tigris::zctas(cb = TRUE, year = 2020) %>%
   rename(Zip = ZCTA5CE20) %>%
   mutate(Zip = sprintf("%05s", as.character(Zip)))
 
+# Create NPI to ZIP mapping necessary for join
+npi_zip_map <- filtered_data %>%
+  mutate(NPI = as.character(NPI)) %>%
+  select(NPI, Provider_Zip) %>%
+  distinct(NPI, .keep_all = TRUE)
+
 zip_cluster_data <- results %>%
-  mutate(Provider_Zip = filtered_data$Provider_Zip) %>%
+  mutate(NPI = as.character(NPI)) %>%
+  left_join(npi_zip_map, by = "NPI") %>%
   group_by(Provider_Zip, Cluster_Label) %>%
   summarise(Count = n(), .groups = "drop")
 
-zip_cluster_sf <- left_join(zcta_shapes, zip_cluster_data, by = c("Zip" = "Provider_Zip")) %>%
+zip_cluster_sf <- left_join(zcta_shapes,
+                            zip_cluster_data %>%
+                              mutate(Provider_Zip = sprintf("%05s", as.character(Provider_Zip))),
+                            by = c("Zip" = "Provider_Zip")) %>%
   filter(!is.na(Cluster_Label)) %>%
   st_make_valid() %>%
   filter(st_geometry_type(geometry) %in% c("POLYGON", "MULTIPOLYGON")) %>%
