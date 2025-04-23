@@ -15,9 +15,15 @@ output:
     numbered_sections: true
     theme: readable
 ---
-
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE
+)
+```
 # Introduction
 This project analyzes Medicare provider data for the Tampa Bay region to understand service patterns, cost structures, and geopgraphic distributions. We utilize association rule mining, k-means clustering, linear regression, and geospatial visualization to explore relationships within the data. The primary data source is the CMS Medicare Provider Utilization and Payment Data Public Use File. Our goal is to identify key trends and factors influencing healthcare delivery and costs in this specific geographic area.
+
 
 # Setup: Loading Libraries and Data
 ## Load Required Libraries
@@ -40,13 +46,15 @@ required_packages <- c(
   "purrr",
   "stringr",
   "lme4",
-  "broom.mixed"
+  "broom.mixed",
+  "tibble",
+  "grepel"
 )
 
 # Install any packages that are not already installed
 to_install <- setdiff(required_packages, rownames(installed.packages()))
 if (length(to_install) > 0) {
-  install.packages(to_install, dependencies = TRUE)
+  install.packages(to_install, dependencies = TRUE, repos = "https://cloud.r-project.org/")
 }
 
 # Load all required packages and check if successfully loaded
@@ -59,18 +67,6 @@ for (pkg in required_packages) {
 # Enable caching for tigris package
 options(tigris_use_cache = TRUE)
 
-```
-
-# Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish, and Scott Young
-1. Assigning Tampa Bay regional ZIP codes to a variable.
-2. Reading in the initial dataset.
-3. Adjusting misinputs on the initial dataset.
-4. Filter the data by Tampa Bay ZIP codes.
-5. Renaming the columns.
-6. Writing the dataset to a usable .csv.
-7. Printing where the file was written to.
-```{r, "Step 1"}
-## Step 1.1
 # Tampa Bay ZIP codes
 tampa_bay_zips <- as.numeric(c(
   "34423","34428","34429","34430","34431","34432","34433","34434","34436","34442","34445",
@@ -93,78 +89,397 @@ tampa_bay_zips <- as.numeric(c(
   "34295"
 ))
 
-filtered_data <- read_csv("Data/Medicare_dataset.csv", show_col_types = FALSE) %>%
+```
+
+# Cleaning the dataset: Sneh Patel, Steven Barden, Christopher Reddish, and Scott Young
+```{r}
+# Assigning a datapath for the filtered_data.csv
+filtered_data_file_path <- "Data/filtered_data.csv"
+
+# Bypassing the cleaning step if the file exists from previous use
+if (!file.exists(filtered_data_file_path)) {
+  filtered_data <- read_csv("Data/Medicare_dataset.csv", show_col_types = FALSE) %>%
 # Amending mistakenly attributed ZIP codes from original dataset
-  mutate(Rndrng_Prvdr_Zip5 = ifelse(Rndrng_Prvdr_Zip5 %in% c("19107", "19144"), "33308", Rndrng_Prvdr_Zip5)) %>%
-  filter(grepl("^\\d+$", Rndrng_Prvdr_Zip5)) %>%
-  mutate(Rndrng_Prvdr_Zip5 = as.numeric(Rndrng_Prvdr_Zip5)) %>%
+    mutate(Rndrng_Prvdr_Zip5 = ifelse(Rndrng_Prvdr_Zip5 %in% c("19107", "19144"), "33308", Rndrng_Prvdr_Zip5)) %>%
+    filter(grepl("^\\d+$", Rndrng_Prvdr_Zip5)) %>%
+    mutate(Rndrng_Prvdr_Zip5 = as.numeric(Rndrng_Prvdr_Zip5)) %>%
 # Filter by Tampa Bay ZIP codes
-  filter(Rndrng_Prvdr_Zip5 %in% tampa_bay_zips) %>%
+    filter(Rndrng_Prvdr_Zip5 %in% tampa_bay_zips) %>%
 # Rename columns to be more immediately understandable  
-  rename(
-    NPI = Rndrng_NPI,
-    Provider_Last_Name = Rndrng_Prvdr_Last_Org_Name,
-    Provider_First_Name = Rndrng_Prvdr_First_Name,
-    Provider_MI = Rndrng_Prvdr_MI,
-    Provider_Credentials = Rndrng_Prvdr_Crdntls,
-    Entity_Code = Rndrng_Prvdr_Ent_Cd,
-    Provider_Street1 = Rndrng_Prvdr_St1,
-    Provider_Street2 = Rndrng_Prvdr_St2,
-    Provider_City = Rndrng_Prvdr_City,
-    Provider_State = Rndrng_Prvdr_State_Abrvtn,
-    FIPS_Code = Rndrng_Prvdr_State_FIPS,
-    Provider_Zip = Rndrng_Prvdr_Zip5,
-    RUCA_Code = Rndrng_Prvdr_RUCA,
-    RUCA_Description = Rndrng_Prvdr_RUCA_Desc,
-    Provider_Country = Rndrng_Prvdr_Cntry,
-    Provider_Type = Rndrng_Prvdr_Type,
-    Medicare_Participation = Rndrng_Prvdr_Mdcr_Prtcptg_Ind,
-    HCPCS_Code = HCPCS_Cd,
-    HCPCS_Description = HCPCS_Desc,
-    HCPCS_Drug_Indicator = HCPCS_Drug_Ind,
-    Place_Of_Service = Place_Of_Srvc,
-    Total_Beneficiaries = Tot_Benes,
-    Total_Services = Tot_Srvcs,
-    Total_Beneficiary_Service_Days = Tot_Bene_Day_Srvcs,
-    Avg_Submitted_Charge = Avg_Sbmtd_Chrg,
-    Avg_Medicare_Allowed = Avg_Mdcr_Alowd_Amt,
-    Avg_Medicare_Payment = Avg_Mdcr_Pymt_Amt,
-    Avg_Medicare_Standardized_Amt = Avg_Mdcr_Stdzd_Amt
-  ) %>%
-    mutate(
-    across(
-      .cols = c(Avg_Medicare_Payment, Avg_Medicare_Allowed, Avg_Submitted_Charge, Avg_Medicare_Standardized_Amt),
-      .fns = ~ gsub("\\$", "", as.character(.))
-      )
+    rename(
+      NPI = Rndrng_NPI,
+      Provider_Last_Name = Rndrng_Prvdr_Last_Org_Name,
+      Provider_First_Name = Rndrng_Prvdr_First_Name,
+      Provider_MI = Rndrng_Prvdr_MI,
+      Provider_Credentials = Rndrng_Prvdr_Crdntls,
+      Entity_Code = Rndrng_Prvdr_Ent_Cd,
+      Provider_Street1 = Rndrng_Prvdr_St1,
+      Provider_Street2 = Rndrng_Prvdr_St2,
+      Provider_City = Rndrng_Prvdr_City,
+      Provider_State = Rndrng_Prvdr_State_Abrvtn,
+      FIPS_Code = Rndrng_Prvdr_State_FIPS,
+      Provider_Zip = Rndrng_Prvdr_Zip5,
+      RUCA_Code = Rndrng_Prvdr_RUCA,
+      RUCA_Description = Rndrng_Prvdr_RUCA_Desc,
+      Provider_Country = Rndrng_Prvdr_Cntry,
+      Provider_Type = Rndrng_Prvdr_Type,
+      Medicare_Participation = Rndrng_Prvdr_Mdcr_Prtcptg_Ind,
+      HCPCS_Code = HCPCS_Cd,
+      HCPCS_Description = HCPCS_Desc,
+      HCPCS_Drug_Indicator = HCPCS_Drug_Ind,
+      Place_Of_Service = Place_Of_Srvc,
+      Total_Beneficiaries = Tot_Benes,
+      Total_Services = Tot_Srvcs,
+      Total_Beneficiary_Service_Days = Tot_Bene_Day_Srvcs,
+      Avg_Submitted_Charge = Avg_Sbmtd_Chrg,
+      Avg_Medicare_Allowed = Avg_Mdcr_Alowd_Amt,
+      Avg_Medicare_Payment = Avg_Mdcr_Pymt_Amt,
+      Avg_Medicare_Standardized_Amt = Avg_Mdcr_Stdzd_Amt
     ) %>%
-  select(-Provider_First_Name, -Provider_MI)
+# Removing currency symbol from the following columns      
+    mutate(
+      across(
+        .cols = c(Avg_Medicare_Payment, Avg_Medicare_Allowed, Avg_Submitted_Charge, Avg_Medicare_Standardized_Amt),
+        .fns = ~ gsub("\\$", "", as.character(.))
+        )
+      ) %>%
+    select(-Provider_First_Name, -Provider_MI)
 
 # Save the filtered data to a new CSV in the 'data' folder
 write.csv(filtered_data, "Data/filtered_data.csv", row.names = FALSE)
 
 # Print confirmation
 print(paste("Filtered data saved to: Data/filtered_data.csv"))
+} else{
+  print(paste("File '", filtered_data_file_path, "' already exists. Skipping creation."))
+}
 
 ```
-# Load Data Once
-1. Read in the filtered .csv file for easier use without having to load the initial dataset.
-```{r, "Load Data"}
+
+## Load Data Once If Clean Set Exists
+Read in the filtered .csv file for easier use without having to load the initial dataset.
+```{r}
 #Load the filtered data ONCE after cleaning and take care of problems of FIPS code error and zip map for k-mean map
 filtered_data <- read_csv("Data/filtered_data.csv",
                           col_types = cols(FIPS_Code = col_character())) %>%
   mutate(FIPS_Code = as.numeric(gsub("[^0-9]", "", FIPS_Code)), Provider_Zip = sprintf("%05s", as.character(Provider_Zip)))
 ```
+
+
 # Association Rule Mining: Christopher Reddish, Scott Young
-```{r, "Arules"}
-rmarkdown::render("Arules.Rmd")
-browseURL("Arules.html")
+## 📘 Introduction
+This project detects potentially suspicious billing behavior among Medicare providers in the Tampa Bay area. Using association rule mining and a composite scoring model, it flags providers who may warrant audit review.
+
+### 🔹 Step 1: Clean and Prepare Data
+```{r step-1-clean-data}
+filtered_data <- read.csv("Data/filtered_data.csv")
+
+clean_df <- filtered_data %>%
+  mutate(
+    Avg_Medicare_Payment = as.numeric(Avg_Medicare_Payment)
+  ) %>%
+  filter(
+    !is.na(Provider_Type),
+    !is.na(HCPCS_Code),
+    !is.na(NPI),
+    as.numeric(Avg_Medicare_Payment) >= 10
+  ) %>%
+  mutate(
+    NPI = as.character(NPI),
+    HCPCS_Code = as.character(HCPCS_Code),
+    Provider_Type = as.factor(trimws(Provider_Type))
+  ) %>%
+  select(NPI, HCPCS_Code, Avg_Medicare_Payment, Provider_Type, Provider_Last_Name)
+
 ```
-## Summary of findings
+### 🔹 Step 2: Generate Association Rules by Specialty
+```{r step-2-rules-mining, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+# Initialize lists to store results
+all_rule_matches <- tibble()      # For NPI-rule match scoring in Step 3
+provider_summary_list <- list()   # For rule-based provider summaries
+
+# Step 2A: Split the dataset by specialty (Provider_Type)
+specialty_groups <- clean_df %>%
+  group_by(Provider_Type) %>%
+  group_split()
+
+# Step 2B: Loop through each specialty subset
+for (spec_df in specialty_groups) {
+  spec_name <- as.character(unique(spec_df$Provider_Type))
+  if (nrow(spec_df) < 2) next
+
+  # Step 2C: Convert each NPI into a transaction of billed HCPCS codes
+  provider_tx <- spec_df %>%
+    group_by(NPI) %>%
+    summarise(items = list(unique(HCPCS_Code)), .groups = "drop")
+
+  tx_list <- lapply(split(provider_tx$items, provider_tx$NPI), unlist)
+  if (length(tx_list) < 2) next
+
+  trans <- as(tx_list, "transactions")
+
+  # Step 2D: Generate association rules for this specialty
+  rules <- apriori(trans, parameter = list(supp = 0.02, conf = 0.7, maxlen = 2))
+  if (length(rules) == 0) next
+
+  # Step 2E: Filter rules by lift and convert to data frame
+  rules_df_raw <- as(rules, "data.frame")
+  rules_df_filtered <- rules_df_raw %>% filter(lift >= 2)
+  if (nrow(rules_df_filtered) == 0) next
+
+  # Add readable labels and parse rule structure for each rule
+  rules_df_filtered$lhs <- labels(lhs(rules))[as.integer(rownames(rules_df_filtered))]
+  rules_df_filtered$rhs <- labels(rhs(rules))[as.integer(rownames(rules_df_filtered))]
+  rules_df_filtered <- rules_df_filtered %>%
+    mutate(
+      rule_label = paste(lhs, "=>", rhs),
+      lhs_items = strsplit(gsub("[{}]", "", lhs), ","),
+      rhs_items = strsplit(gsub("[{}]", "", rhs), ","),
+      all_items = map2(lhs_items, rhs_items, ~ unique(trimws(c(.x, .y))))
+    )
+
+  # Step 2F: Match rules to providers
+  provider_rule_map <- list()
+  npi_rule_log <- tibble()
+
+  for (npi in names(tx_list)) {
+    provider_items <- tx_list[[npi]]
+
+    matched <- rules_df_filtered %>%
+      filter(map_lgl(all_items, ~ all(.x %in% provider_items)))
+
+    if (nrow(matched) > 0) {
+      provider_rule_map[[npi]] <- matched$rule_label
+
+      npi_rule_log <- bind_rows(npi_rule_log, tibble(
+        NPI = npi,
+        Rule_Label = matched$rule_label,
+        Lift = matched$lift,
+        Confidence = matched$confidence
+      ))
+    }
+  }
+
+  # Step 2G: Create provider summary stats for rule match counts
+  if (length(provider_rule_map) > 0) {
+    provider_summary <- tibble(
+      Specialty = spec_name,
+      NPI = names(provider_rule_map),
+      Total_Rules = sapply(provider_rule_map, function(x) length(unique(x)))
+    )
+
+    hcpcs_diversity <- spec_df %>%
+      group_by(NPI) %>%
+      summarise(Unique_Codes = n_distinct(HCPCS_Code), .groups = "drop")
+
+    provider_summary <- provider_summary %>%
+      left_join(hcpcs_diversity, by = "NPI") %>%
+      mutate(
+        Rules_Per_Code = round(Total_Rules / Unique_Codes, 2),
+        Unique_Codes_Per_Rule = round(Unique_Codes / Total_Rules, 4)
+      )
+
+    provider_summary_list[[spec_name]] <- provider_summary
+    all_rule_matches <- bind_rows(all_rule_matches, npi_rule_log)
+  }
+}
+
+# Export objects for Step 3
+final_provider_results <- bind_rows(provider_summary_list)
+npi_rule_scores <- all_rule_matches %>%
+  group_by(NPI) %>%
+  summarise(
+    mean_lift = mean(Lift, na.rm = TRUE),
+    mean_confidence = mean(Confidence, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+```
+
+### 🔹 Step 3:  Step 3A: Merge all provider summaries across specialties into one dataset
+```{r step-3-scoring}
+# Step 3A: Merge rule-based stats into the full cleaned Medicare dataset
+merged_df <- clean_df %>%
+  left_join(final_provider_results, by = "NPI")
+
+# Step 3B: Append average lift and confidence per provider from rule matches
+scored_providers <- merged_df %>%
+  left_join(npi_rule_scores, by = "NPI")
+
+# Step 3C: Z-score standardization for Rules_Per_Code within each specialty
+scored_providers <- scored_providers %>%
+  group_by(Provider_Type) %>%
+  mutate(Z_Score_RPC = as.numeric(scale(Rules_Per_Code))) %>%
+  ungroup()
+
+# Step 3D: Compute a composite audit score
+# This blends:
+#   - billing repetition
+#   - rule lift
+#   - rule confidence
+#   - average Medicare payout
+#   - relative specialty behavior
+scored_providers <- scored_providers %>%
+  mutate(
+    Composite_Audit_Score = round(
+      (coalesce(Rules_Per_Code, 0) * 1.5) +
+      (coalesce(mean_lift, 0) * 2.0) +
+      (coalesce(mean_confidence, 0) * 1.0) +
+      (coalesce(as.numeric(Avg_Medicare_Payment, 0) / 100)) +
+      coalesce(Z_Score_RPC, 0),
+      2
+    )
+  )
+
+# Step 3E: Append sample size per provider for audit traceability
+scored_providers <- scored_providers %>%
+  group_by(NPI) %>%
+  mutate(Sample_Size = n()) %>%
+  ungroup()
+
+```
+
+### 🔹 Step 4: Risk Stratification & Visualization
+```{r step-4-risk-visualization, fig.width=18, fig.height=11}
+# Step 4A: Flag audit risk levels using percentile thresholds
+# ------------------------------------------------------------
+# We classify providers within each specialty based on Composite Score:
+# - Top 2% = Extreme High Risk
+# - 92–98% = High Risk
+# - 80–92% = Moderate Risk
+# - Bottom 80% = Low/No Risk
+
+scored_flagged <- scored_providers %>%
+  group_by(Provider_Type) %>%
+  mutate(
+    p80 = quantile(Composite_Audit_Score, 0.80, na.rm = TRUE),
+    p92 = quantile(Composite_Audit_Score, 0.92, na.rm = TRUE),
+    p98 = quantile(Composite_Audit_Score, 0.98, na.rm = TRUE),
+    Audit_Flag = case_when(
+      Composite_Audit_Score >= p98 ~ "Extreme High Risk (98–100%)",
+      Composite_Audit_Score >= p92 ~ "High Risk (92–98%)",
+      Composite_Audit_Score >= p80 ~ "Moderate Risk (80–92%)",
+      TRUE                         ~ "Low/No Risk (0–80%)"
+    )
+  ) %>%
+  ungroup()
+
+# Step 4B: Filter to valid (non-NA, >0) composite scores
+valid_scores_df <- scored_flagged %>%
+  filter(!is.na(Composite_Audit_Score), Composite_Audit_Score > 0)
+
+# Step 4C: Manually set your "Top 15 Most Interesting" specialties
+top15_specialties <- c(
+  "Anesthesiology", "Cardiology", "Dermatology", "Diagnostic Radiology",
+  "Emergency Medicine", "Family Practice", "Gastroenterology", "General Surgery",
+  "Internal Medicine", "Interventional Cardiology", "Nurse Practitioner",
+  "Orthopedic Surgery", "Physician Assistant", "Podiatry", "Vascular Surgery"
+)
+
+# Step 4D: Filter only the specialties of interest and cap extreme outliers
+volume_filtered_df <- valid_scores_df %>%
+  filter(
+    Provider_Type %in% top15_specialties,
+    Composite_Audit_Score <= quantile(Composite_Audit_Score, 0.99, na.rm = TRUE),
+    Avg_Medicare_Payment <= 1000
+  )
+
+# Step 4E: Generate plot with fixed x and y axis, no log scale
+composite_plot <- ggplot(volume_filtered_df, aes(
+  x = Avg_Medicare_Payment,
+  y = Composite_Audit_Score,
+  color = Audit_Flag
+)) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~ Provider_Type, scales = "fixed", nrow = 5) +
+  scale_color_manual(
+    values = c(
+      "Extreme High Risk (98–100%)" = "purple",
+      "High Risk (92–98%)" = "red",
+      "Moderate Risk (80–92%)" = "gold",
+      "Low/No Risk (0–80%)" = "green"
+    )
+  ) +
+  scale_x_continuous(
+    labels = scales::dollar_format(),
+    breaks = c(0, 250, 500, 750, 1000),
+    limits = c(0, 1000)
+  ) +
+  scale_y_continuous(
+    limits = c(0, 85),
+    breaks = seq(0, 80, by = 20)
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(strip.text = element_text(size = 10)) +
+  labs(
+    title = "Composite Audit Score vs. Medicare Payment",
+    subtitle = "Top 15 Most Interesting Specialties – Risk Segmentation at 80/92/98 Percentiles",
+    x = "Average Medicare Payment ($)",
+    y = "Composite Audit Score",
+    color = "Audit Risk Level"
+  )
+
+# Step 4F: Save output as PNG
+ggsave("Top15_Composite_vs_Payment_BySpecialty_FIXEDAXIS.png",
+       plot = composite_plot, dpi = 300, width = 14, height = 9)
+
+# Step 4G: Render in output
+composite_plot
+
+```
+
+### 🔹 Step 5: Top Providers Report
+```{r step-5-top-providers}
+# Step 5A: Join Provider_Last_Name from filtered_data, and rename it cleanly
+scored_named <- scored_providers %>%
+  left_join(
+    filtered_data %>%
+      mutate(NPI = as.character(NPI)) %>%
+      select(NPI, Provider_Last_Name),
+    by = "NPI"
+  ) %>%
+  rename(Provider_Last_Name = Provider_Last_Name.y)  # in case it became .y
+
+# Step 5B: Top 50 providers overall
+top50_overall <- scored_named %>%
+  distinct(NPI, .keep_all = TRUE) %>%
+  arrange(desc(Composite_Audit_Score)) %>%
+  slice_head(n = 50)
+
+# Display Top 50 Table
+knitr::kable(
+  top50_overall %>%
+    select(Provider_Last_Name, NPI, Provider_Type, Composite_Audit_Score),
+  caption = "Top 50 Providers Overall by Composite Audit Score"
+)
+
+# Step 5C: Get Top 3 Providers by Specialty without repeating NPIs
+top3_by_specialty <- scored_named %>%
+  filter(!is.na(Composite_Audit_Score)) %>%
+  group_by(Provider_Type, NPI) %>%
+  slice_max(order_by = Composite_Audit_Score, n = 1) %>%  # get max score per NPI
+  ungroup() %>%
+  distinct(NPI, .keep_all = TRUE) %>%                     # remove any duplicate NPIs
+  group_by(Provider_Type) %>%
+  slice_max(order_by = Composite_Audit_Score, n = 3) %>%  # now take top 3 per specialty
+  ungroup()
+
+# Display Top 3 Per Specialty Table
+knitr::kable(
+  top3_by_specialty %>%
+    select(Provider_Type, Provider_Last_Name, NPI, Composite_Audit_Score),
+  caption = "Top 3 Providers by Composite Score in Each Specialty"
+)
+```
+## 📄 Summary of Association Rule Findings
+
 
 # K-Means Clustering: Christopher Reddish, Sneh Patel
+## 📘 Introduction
 The primary goal of this analysis is to analyze Medicare provider data using k-means clustering, assign meaningful cluster labels to providers based on cost and service volume, and visualize the geographic distribution of these clusters across ZIP codes in Florida using an interactive map.
 
-```{r, "Step 3"}
+### 🔹 Step 1: Prepare and Scale Data for Clustering
+```{r}
 # ---- Step 3: K-Means Clustering ----
 # K-Means Clustering
 df_raw <- filtered_data %>%
@@ -180,12 +495,19 @@ df_raw <- filtered_data %>%
 stopifnot(all(sapply(df_raw, is.numeric)))
 
 df_scaled <- scale(df_raw)
+```
+
+### 🔹 Step 2: Perform K-Means Clustering
+```{r}
 k <- min(4, nrow(unique(df_scaled)))
 if (k < 2) stop("Not enough data to form clusters.")
 
 set.seed(123)
 clusters <- kmeans(df_scaled, centers = k, nstart = 25)
+```
 
+### 🔹 Step 3: Assign Cluster Labels
+```{r}
 cluster_labels <- c(
   "1" = "Moderate Cost, High Volume",
   "2" = "Typical Providers",
@@ -198,7 +520,10 @@ results <- df_raw %>%
     Cluster = clusters$cluster,
     Cluster_Label = cluster_labels[as.character(Cluster)]
   )
+```
 
+### 🔹 Step 4: Prepare Geographic and Provider Locations
+```{r}
 # Mapping
 zcta_shapes <- tigris::zctas(cb = TRUE, year = 2020) %>%
   rename(Zip = ZCTA5CE20) %>%
@@ -209,13 +534,19 @@ npi_zip_map <- filtered_data %>%
   mutate(NPI = as.character(NPI)) %>%
   select(NPI, Provider_Zip) %>%
   distinct(NPI, .keep_all = TRUE)
+```
 
+### 🔹 Step 5: Aggregate Cluster Data by ZIP code
+```{r}
 zip_cluster_data <- results %>%
   mutate(NPI = as.character(NPI)) %>%
   left_join(npi_zip_map, by = "NPI") %>%
   group_by(Provider_Zip, Cluster_Label) %>%
   summarise(Count = n(), .groups = "drop")
+```
 
+### 🔹 Step 6: Join Cluster Aggregates to Geopgrahic Shapes
+```{r}
 zip_cluster_sf <- left_join(zcta_shapes,
                             zip_cluster_data %>%
                               mutate(Provider_Zip = sprintf("%05s", as.character(Provider_Zip))),
@@ -224,7 +555,10 @@ zip_cluster_sf <- left_join(zcta_shapes,
   st_make_valid() %>%
   filter(st_geometry_type(geometry) %in% c("POLYGON", "MULTIPOLYGON")) %>%
   st_transform(4326)
+```
 
+### 🔹 Step 7: Define Map Aesthetics
+```{r}
 zip_cluster_sf <- zip_cluster_sf %>%
   mutate(
     fill_color = dplyr::recode(Cluster_Label,
@@ -236,7 +570,10 @@ zip_cluster_sf <- zip_cluster_sf %>%
     ),
     opacity = scales::rescale(Count, to = c(0.4, 1))
   )
+```
 
+### 🔹 Step 8: Create and Display Interactive Leaflet Map
+```{r}
 # Interactive Leaflet Map
 leaflet_map <- leaflet::leaflet(zip_cluster_sf) %>%
   leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) %>%
@@ -263,25 +600,25 @@ leaflet_map <- leaflet::leaflet(zip_cluster_sf) %>%
     title = "Cluster Type",
     opacity = 1
   )
+```
 
+### 🔹 Step 9: Save and Output Map
+```{r}
 htmlwidgets::saveWidget(leaflet_map, "Output/Medicare_Clusters_FL.html", selfcontained = TRUE)
 
+leaflet_map
 ```
-## Summary of Findings
+## 📄 Summary of K-Means Clustering Findings
 According to the provider statistics, Cluster 2 is the most common, accounting for the majority of providers,
 while Cluster 3 is under-represented, implying potential clustering imbalances. Cluster 2 has a wide range of values for total services, average submitted charge, and average Medicare payment, with average Medicare payments at $70.23, average submitted charges at $356.84, and an average of 604 total services; however, Cluster 3 has higher costs and lower service volumes, with average Medicare payments at $425.36, average submitted charges at $4,490.86, and an average of 29 total services. These findings indicate that the clustering technique should be reconsidered, possibly using new algorithms or feature engineering, as well as a more rigorous outlier analysis within Cluster 2 to assess whether some providers should be reclassified in order to establish more distinct and balanced groups.
 
+
 # Linear Regression: Steven Barden, Scott Young
- The primary goal of this methodology is to identify and understand factors influencing average Medicare payments.
- 1. Creation of a dataframe to be used within this section for linear regression/linear mixed-effects.
- 2. Creation of the model that compares logarithmic Medicare payements to scaled statistics of various factors.
- 3. Print of a summary of the model's findings.
- 4. Creation of a dataframe that narrows down key drivers after analyzing the model's summary.
- 5. Creation of a key drivers plot.
- 6. Creation of a dataframe that lists each specialty.
- 7. Creation of a plot that maps each specialty to their impact on Medicare payment costs.
-```{r, "Step 4"}
-## Linear Regression (Step 4)
+## 📘 Introduction
+The primary goal of this methodology is to identify and understand factors influencing average Medicare payments.
+
+### 🔹 Step 1: Prepare Data for Linear Mixed-Effects Model
+```{r}
 # Load and clean with basic numeric conversion
 df_lm <- filtered_data %>%
   select(
@@ -323,7 +660,10 @@ df_lm <- filtered_data %>%
     Place_Of_Service, RUCA_Description,
     Specialty
   )
+```
 
+### 🔹 Step 2: Fit Linear Mixed-Effects Model
+```{r}
 # Run simplified regression (removed HCPCS_Description)
 mixed_model <- lmer(
   Log_Medicare_Payment ~ Services_z + Submitted_Charge_z + Beneficiaries_z +
@@ -331,10 +671,22 @@ mixed_model <- lmer(
     (1 | Specialty),
   data = df_lm,
 )
+```
 
-# View results
+### 🔹 Step 3: Raw Summary of the Model
+```{r}
+# Raw Model Summary
 summary(mixed_model)
 
+# Fixed Effects Summary
+knitr::kable(tidy(mixed_model, effects = "fixed", conf.int = TRUE), digits =3)
+
+# Random Effects Summary
+knitr::kable(tidy(mixed_model, effects = "ran_pars", scales = "vcov"), digits = 3)
+```
+
+### 🔹 Step 4: Analyze and Plot Key Fixed Effects
+```{r}
 # Key fixed effect drivers
 fixed_effects <- tidy(mixed_model,
                       effects = "fixed",
@@ -375,8 +727,12 @@ ggsave("Output/plot_key_drivers_transparent.png",
        width = 8,
        height = 4
 )
+# Display the plot
+plot_key_drivers
+```
 
-
+### 🔹 Step 5: Analyze and Plot Random Effects
+```{r}
 # Variation between specialties
 specialty_effects <- ranef(mixed_model,
                            condVar = FALSE)$Specialty %>%
@@ -415,32 +771,48 @@ ggsave(
     units = "in",
     dpi = 300
 )
+# Display the plot
+plot_specialty_variation
 ```
-## Summary of Findings
+## 📄 Summary of Linear Regression Findings
 After analyzing 170,000 Medicare claims across the Tampa Bay area, this statistical model identifies key payment drivers. It uses a linear mixed-effects methodology that is a subset of linear regression to find differences between 76 different provider types while accounting for average charge amounts.
 
 
 # Heat Map Visual: Khushi Patel, Naomi Vaid
- 
-```{r, "Step 5"}
+## 📘 Introduction
+The primary goal of the heat map visualization was to see at a glance average Medicare costs in the Tampa Bay region.
 
+### 🔹 Step 1: Define Input File Path for Shapefiles
+```{r}
 # File paths
 shapefile_path <- "Data/tl_2010_12_zcta510.shp"
+```
 
+### 🔹 Step 2: Load and Prepare Medicare Data for Visualization
+``` {r}
 # Load Medicare data
 medicare_cleaned <- filtered_data %>%
   mutate(
     Provider_Zip = str_pad(substr(as.character(Provider_Zip), 1, 5), 5, pad = "0"),
     Avg_Medicare_Payment = as.numeric(gsub("[$,]", "", Avg_Medicare_Payment))
   )
+```
 
+### 🔹 Step 3: Load Geographic Data Shapefile
+```{r}
 # Load shapefile
 zcta <- st_read(shapefile_path) %>%
   mutate(ZCTA5CE10 = as.character(ZCTA5CE10))
+```
 
+### 🔹 Step 4: Set Analysis Parameters
+```{r}
 # Choose specialty
 selected_specialty <- "Internal Medicine"
+```
 
+### 🔹 Step 5: Filter and Summarize Data by Specialty and ZIP
+```{r}
 # Filter and summarize
 hm_filtered_data <- medicare_cleaned %>%
   filter(Provider_Type == selected_specialty) %>%
@@ -450,15 +822,24 @@ hm_filtered_data <- medicare_cleaned %>%
     Providers = n(),
     .groups = "drop"
   )
+```
 
+### 🔹 Step 6: Merge Geographic and Summarized Medicare Data
+```{r}
 # Merge with shapefile
 merged_data <- zcta %>%
   left_join(hm_filtered_data, by = c("ZCTA5CE10" = "Provider_Zip"))
+```
 
+### 🔹 Step 7: Filter Merged Data to Tampa Bay Region
+```{r}
 # Filter with Tampa Bay ZIP codes
 tampa_map_data <- merged_data %>%
   filter(ZCTA5CE10 %in% tampa_bay_zips)
+```
 
+### 🔹 Step 8 Create Map Plot
+```{r}
 # Create heat map
 tampa_plot <- ggplot(data = tampa_map_data) +
   geom_sf(aes(fill = Avg_Payment), color = "white", size = 0.2) +
@@ -502,20 +883,23 @@ ggsave(
   bg = "white"
 )
 
-# Here is a summary of our analysis based on Medicare payment data visualization:
-
-# We analyzed average Medicare payments for providers specializing in Internal Medicine across Tampa Bay ZIP codes. 
-# This process began by loading and preparing a cleaned Medicare dataset and a shapefile representing Florida ZIP Code Tabulation Areas (ZCTAs).
-
-# After filtering the data for the selected specialty ("Internal Medicine"), we calculated the average Medicare 
-# payment and the number of providers per ZIP code. This summarized dataset was then merged with the shapefile data 
-# to enable geographic plotting.
-
-# Using ggplot2 and the sf package, we created a choropleth map showing the distribution of average Medicare payments 
-# across Tampa Bay. Areas with higher average payments appear in brighter plasma shades, while areas with lower payments 
-# or no data are shown in muted tones.
-
-# The heatmap helps reveal regional disparities in Medicare reimbursements, highlighting ZIP codes with notably higher 
-# or lower average payments. These visual insights can inform further investigation into geographic trends in healthcare 
-# spending, potential inequities in reimbursement rates, or gaps in provider coverage for Internal Medicine in Tampa Bay.
+# Display the plot
+tampa_plot
 ```
+## 📄 Summary of Heat Map Visualization Findings
+Here is a summary of our analysis based on Medicare payment data visualization:
+
+We analyzed average Medicare payments for providers specializing in Internal Medicine across Tampa Bay ZIP codes. 
+This process began by loading and preparing a cleaned Medicare dataset and a shapefile representing Florida ZIP Code Tabulation Areas (ZCTAs).
+
+After filtering the data for the selected specialty ("Internal Medicine"), we calculated the average Medicare 
+payment and the number of providers per ZIP code. This summarized dataset was then merged with the shapefile data 
+to enable geographic plotting.
+
+Using ggplot2 and the sf package, we created a choropleth map showing the distribution of average Medicare payments 
+across Tampa Bay. Areas with higher average payments appear in brighter plasma shades, while areas with lower payments 
+or no data are shown in muted tones.
+
+The heatmap helps reveal regional disparities in Medicare reimbursements, highlighting ZIP codes with notably higher 
+or lower average payments. These visual insights can inform further investigation into geographic trends in healthcare 
+spending, potential inequities in reimbursement rates, or gaps in provider coverage for Internal Medicine in Tampa Bay.
