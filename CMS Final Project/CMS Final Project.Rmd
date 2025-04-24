@@ -783,7 +783,7 @@ After analyzing 170,000 Medicare claims across the Tampa Bay area, this statisti
 The primary goal of the heat map visualization was to see at a glance average Medicare costs in the Tampa Bay region.
 
 ### 🔹 Step 1: Define Input File Path for Shapefiles
-```{r}
+```{r, 'r map plot'}
 # File paths
 shapefile_path <- "Data/tl_2010_12_zcta510.shp"
 ```
