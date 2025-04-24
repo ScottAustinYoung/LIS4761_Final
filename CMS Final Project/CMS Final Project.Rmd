@@ -31,7 +31,7 @@ This project analyzes Medicare provider data for the Tampa Bay region to underst
 
 # Setup: Loading Libraries and Data
 ## Load Required Libraries
-```{r, "libraries"}
+```{r libraries}
 # Add your library below.
 # List of required packages
 required_packages <- c(
