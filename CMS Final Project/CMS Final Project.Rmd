@@ -867,8 +867,6 @@ tampa_plot <- ggplot(data = tampa_map_data) +
     plot.subtitle = element_text(size = 13),
     plot.caption = element_text(size = 10, face = "italic")
   )
-# Print map
-tampa_plot
 
 # Save the heat map to the output folder
 ggsave(
