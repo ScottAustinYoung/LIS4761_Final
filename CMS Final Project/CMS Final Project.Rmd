@@ -14,6 +14,7 @@ output:
     toc_float: true
     numbered_sections: true
     theme: readable
+    self_contained: true
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -30,7 +31,7 @@ This project analyzes Medicare provider data for the Tampa Bay region to underst
 
 # Setup: Loading Libraries and Data
 ## Load Required Libraries
-```{r, "Libraries"}
+```{r}
 # Add your library below.
 # List of required packages
 required_packages <- c(
@@ -689,7 +690,7 @@ knitr::kable(tidy(mixed_model, effects = "ran_pars", scales = "vcov"), digits = 
 ```
 
 ### 🔹 Step 4: Analyze and Plot Key Fixed Effects
-```{r}
+```{r, 'r plot1'}
 # Key fixed effect drivers
 fixed_effects <- tidy(mixed_model,
                       effects = "fixed",
@@ -735,7 +736,7 @@ plot_key_drivers
 ```
 
 ### 🔹 Step 5: Analyze and Plot Random Effects
-```{r}
+```{r,'r plot2'}
 # Variation between specialties
 specialty_effects <- ranef(mixed_model,
                            condVar = FALSE)$Specialty %>%
@@ -786,7 +787,7 @@ After analyzing 170,000 Medicare claims across the Tampa Bay area, this statisti
 The primary goal of the heat map visualization was to see at a glance average Medicare costs in the Tampa Bay region.
 
 ### 🔹 Step 1: Define Input File Path for Shapefiles
-```{r, 'r map plot'}
+```{r,}
 # File paths
 shapefile_path <- "Data/tl_2010_12_zcta510.shp"
 ```
