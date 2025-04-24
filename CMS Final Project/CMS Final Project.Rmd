@@ -690,7 +690,7 @@ knitr::kable(tidy(mixed_model, effects = "ran_pars", scales = "vcov"), digits = 
 ```
 
 ### 🔹 Step 4: Analyze and Plot Key Fixed Effects
-```{r, 'r plot 1'}
+```{r plot-1}
 # Key fixed effect drivers
 fixed_effects <- tidy(mixed_model,
                       effects = "fixed",
@@ -736,7 +736,7 @@ plot_key_drivers
 ```
 
 ### 🔹 Step 5: Analyze and Plot Random Effects
-```{r, 'r plot 2'}
+```{r plot-2}
 # Variation between specialties
 specialty_effects <- ranef(mixed_model,
                            condVar = FALSE)$Specialty %>%
@@ -778,6 +778,7 @@ ggsave(
 # Display the plot
 plot_specialty_variation
 ```
+
 ## 📄 Summary of Linear Regression Findings
 After analyzing 170,000 Medicare claims across the Tampa Bay area, this statistical model identifies key payment drivers. It uses a linear mixed-effects methodology that is a subset of linear regression to find differences between 76 different provider types while accounting for average charge amounts.
 
@@ -843,7 +844,7 @@ tampa_map_data <- merged_data %>%
 ```
 
 ### 🔹 Step 8 Create Map Plot
-```{r, 'r map plot'}
+```{r map-plot}
 # Create heat map
 tampa_plot <- ggplot(data = tampa_map_data) +
   geom_sf(aes(fill = Avg_Payment), color = "white", size = 0.2) +
@@ -890,6 +891,7 @@ ggsave(
 # Display the plot
 tampa_plot
 ```
+
 ## 📄 Summary of Heat Map Visualization Findings
 Here is a summary of our analysis based on Medicare payment data visualization:
 
