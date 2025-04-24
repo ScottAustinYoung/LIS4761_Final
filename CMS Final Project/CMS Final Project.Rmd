@@ -842,7 +842,7 @@ tampa_map_data <- merged_data %>%
 ```
 
 ### 🔹 Step 8 Create Map Plot
-```{r}
+```{r, 'r map plot'}
 # Create heat map
 tampa_plot <- ggplot(data = tampa_map_data) +
   geom_sf(aes(fill = Avg_Payment), color = "white", size = 0.2) +
