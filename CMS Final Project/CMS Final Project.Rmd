@@ -344,7 +344,7 @@ scored_providers <- scored_providers %>%
 ```
 
 ### 🔹 Step 4: Risk Stratification & Visualization
-```{r step-4-risk-visualization, fig.width=18, fig.height=11, 'r viz'}
+```{r step-4-risk-visualization, fig.width=18, fig.height=11 }
 # Step 4A: Flag audit risk levels using percentile thresholds
 # ------------------------------------------------------------
 # We classify providers within each specialty based on Composite Score:
