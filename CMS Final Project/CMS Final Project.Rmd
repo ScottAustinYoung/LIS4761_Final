@@ -690,7 +690,7 @@ knitr::kable(tidy(mixed_model, effects = "ran_pars", scales = "vcov"), digits = 
 ```
 
 ### 🔹 Step 4: Analyze and Plot Key Fixed Effects
-```{r, 'r plot_1'}
+```{r, 'r plot 1'}
 # Key fixed effect drivers
 fixed_effects <- tidy(mixed_model,
                       effects = "fixed",
@@ -736,7 +736,7 @@ plot_key_drivers
 ```
 
 ### 🔹 Step 5: Analyze and Plot Random Effects
-```{r, 'r plot_2'}
+```{r, 'r plot 2'}
 # Variation between specialties
 specialty_effects <- ranef(mixed_model,
                            condVar = FALSE)$Specialty %>%
@@ -843,7 +843,7 @@ tampa_map_data <- merged_data %>%
 ```
 
 ### 🔹 Step 8 Create Map Plot
-```{r, 'r map_plot'}
+```{r, 'r map plot'}
 # Create heat map
 tampa_plot <- ggplot(data = tampa_map_data) +
   geom_sf(aes(fill = Avg_Payment), color = "white", size = 0.2) +
